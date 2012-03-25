@@ -55,15 +55,6 @@ def Usage():
     print
     sys.exit(1)
 
-# Argument processing
-#if len(sys.argv) > 1:
-#  directory = sys.argv[1] #  if len(sys.argv) > 2:
-#    if sys.argv[2] == "SQL":
-#      printSql = True
-#  else: printSql = False
-#else:
-#  Usage()
-
 def startup(startpath):
     gdal.PushErrorHandler()
     skiplist = ['.svn','.shx','.dbf']
@@ -72,49 +63,45 @@ def startup(startpath):
     counterraster = 0
     countervds = 0
 
-#  walkerlist = list(copy.pathwalker)
     processStats(walkers[1], skiplist, startpath,xmlroot)
     for eachpath in walkers[0]:
         startdir = eachpath[0]
         alldirs = eachpath[1]
         allfiles = eachpath[2]
         for eachdir in alldirs:
-        currentdir = os.path.join(startdir,eachdir)
-        #print currentdir
-        raster,vector = tryopends(currentdir)
-        if (not skipfile(currentdir,skiplist) and tryopends(currentdir)):
+            currentdir = os.path.join(startdir,eachdir)
             raster,vector = tryopends(currentdir)
-            if raster:
-            counterraster += 1
-            print counterraster
-            resultsraster,resultsFileStats = processraster(raster,counterraster,currentdir)
-            xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
-            if vector:
-    #         resultsFileStats = fileStats(currentdir)
-    #         statfileStats = outputFileStats(writer, resultsFileStats)
-            countervds += 1
-            resultsvds,resultsFileStats = processvds(vector,countervds,currentdir)
-            xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats, xmlroot)
+            if (not skipfile(currentdir,skiplist) and tryopends(currentdir)):
+                raster,vector = tryopends(currentdir)
+                if raster:
+                    counterraster += 1
+                    print counterraster
+                    resultsraster,resultsFileStats = processraster(raster,counterraster,currentdir)
+                    xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
+                if vector:
+                     #resultsFileStats = fileStats(currentdir)
+                     #statfileStats = outputFileStats(writer, resultsFileStats)
+                    countervds += 1
+                    resultsvds,resultsFileStats = processvds(vector,countervds,currentdir)
+                    xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats, xmlroot)
         for eachfile in allfiles:
-        currentfile = "/".join([startdir, eachfile])
-        #print "Current file" + currentfile
-        if (not skipfile(currentfile,skiplist) and tryopends(currentfile)):
-            raster, vector = tryopends(currentfile)
-            if raster:
-            counterraster += 1
-            resultsraster,resultsFileStats = processraster(raster, counterraster, currentfile)
-            xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats,xmlroot)
-            if vector:
-            if (not skipfile(vector.GetName(),skiplist)):
-    #         resultsFileStats = fileStats(currentfile)
-    #         statfileStats = outputFileStats(writer, resultsFileStats)
-                countervds += 1
-                resultsvds,resultsFileStats = processvds(vector, countervds, currentfile)
-                xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats,xmlroot)
+            currentfile = "/".join([startdir, eachfile])
+            if (not skipfile(currentfile,skiplist) and tryopends(currentfile)):
+                raster, vector = tryopends(currentfile)
+                if raster:
+                    counterraster += 1
+                    resultsraster,resultsFileStats = processraster(raster, counterraster, currentfile)
+                    xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats,xmlroot)
+                if vector:
+                    if (not skipfile(vector.GetName(),skiplist)):
+                        #resultsFileStats = fileStats(currentfile)
+                        #statfileStats = outputFileStats(writer, resultsFileStats)
+                        countervds += 1
+                        resultsvds,resultsFileStats = processvds(vector, countervds, currentfile)
+                        xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats,xmlroot)
 
 def processStats(walkerlist, skiplist, startpath, xmlroot):
     from time import asctime
-    #walkerList = list(pathwalker)
     dirlist, filelist = [], []
     for entry in walkerlist:
         dirlist += entry[1]
@@ -150,10 +137,10 @@ def skipfile(filepath, skiplist):
     skipstatus = None
     for skipitem in skiplist:
         if filepath.find(skipitem) > 0: 
-        skipstatus = True
-        return True
+            skipstatus = True
+            return True
         else:
-        skipstatus = False
+            skipstatus = False
     return skipstatus
   
 def tryopends(filepath):
@@ -196,16 +183,15 @@ def processraster(raster, counterraster, currentpath):
   
 def outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot):
     xmlraster = appendXML(xmlroot, "RasterData")
-
     statfileStats = outputFileStats(resultsFileStats, xmlraster)
     for rasteritem, rastervalue in resultsraster.iteritems(): # for each raster attribute
         if rasteritem <> 'bands':
-        appendXML(xmlraster, rasteritem, rastervalue)
+            appendXML(xmlraster, rasteritem, rastervalue)
         if rasteritem == 'bands':
-        for banditem, bandvalue in rastervalue.iteritems(): # for each band
-        xmlband = appendXML(xmlraster, "RasterBand")
-            for banditemdetails, bandvaluedetails in bandvalue.iteritems():
-        appendXML(xmlband, banditemdetails, bandvaluedetails)
+            for banditem, bandvalue in rastervalue.iteritems(): # for each band
+                xmlband = appendXML(xmlraster, "RasterBand")
+                for banditemdetails, bandvaluedetails in bandvalue.iteritems():
+                    appendXML(xmlband, banditemdetails, bandvaluedetails)
     return True
 
 def processvds(vector, countervds,currentpath):
@@ -256,15 +242,14 @@ def outputvector(resultsvector, counterraster, countervds, resultsFileStats,xmlr
     statfileStats = outputFileStats(resultsFileStats, xmlvector)
     for vectoritem, vectorvalue in resultsvector.iteritems(): # resultsvector includes two dictionaries
         if vectoritem <> 'resultslayers':
-        for vectordsitem, vectordsvalue in vectorvalue.iteritems(): # vectorvalue contains datasource attributes
-        appendXML(xmlvector, vectordsitem, vectordsvalue)
+            for vectordsitem, vectordsvalue in vectorvalue.iteritems(): # vectorvalue contains datasource attributes
+                appendXML(xmlvector, vectordsitem, vectordsvalue)
 
         if vectoritem == 'resultslayers':
-        for layeritem, layervalue in vectorvalue.iteritems(): # vectorvalue contains a dictionary of the layers
-            xmlvectorlayer = appendXML(xmlvector, "VectorLayer")
-
-            for layeritemdetails, layervaluedetails in layervalue.iteritems(): # layervalue contains layer attributes
-        appendXML(xmlvectorlayer, layeritemdetails, layervaluedetails)
+            for layeritem, layervalue in vectorvalue.iteritems(): # vectorvalue contains a dictionary of the layers
+                xmlvectorlayer = appendXML(xmlvector, "VectorLayer")
+                for layeritemdetails, layervaluedetails in layervalue.iteritems(): # layervalue contains layer attributes
+                    appendXML(xmlvectorlayer, layeritemdetails, layervaluedetails)
     return True
 
 def sqlOutput(tableName, valueDict):
