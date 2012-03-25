@@ -154,6 +154,8 @@ def tryopends(filepath):
 
 def extentToLatLon(extent, proj):
     from pyproj import Proj
+    if proj == '' or proj is None:
+        return None
     p1 = Proj(proj, preserve_units=True) 
     if p1.is_latlong():
         return extent
@@ -182,7 +184,9 @@ def processraster(raster, counterraster, currentpath):
     resultsFileStats = fileStats(currentpath)
     for bandnum in range(bandcount):
         band = raster.GetRasterBand(bandnum+1)
-        min, max = band.ComputeRasterMinMax()
+        #TODO this is really expensive! 
+        #min, max = band.ComputeRasterMinMax()
+        min, max = 0, 1
         overviews = band.GetOverviewCount()
         resultseachband = {'bandId': str(bandnum+1), 'min': str(min),'max': str(max), 'overviews': str(overviews)}
         resultseachbandShort = {'bandId': bandnum+1, 'min': min,'max': max, 'overviews': str(overviews)}
@@ -201,7 +205,7 @@ def processraster(raster, counterraster, currentpath):
             'projection': wkt,
             'proj': proj,
             'latlonextent': strip(str(latlon_extent),"()"),
-            'extent': str(extent)
+            'extent': strip(str(extent), "()")
     }
     resultsrasterShort =  {
             'rasterId':counterraster, 
@@ -239,7 +243,11 @@ def processvds(vector, countervds,currentpath):
     resultsFileStats = fileStats(currentpath)
     for layernum in range(vdslayercount): #process all layers
         layer = vector.GetLayer(layernum)
-        layerproj = layer.GetSpatialRef().ExportToProj4()
+        spatialref = layer.GetSpatialRef()
+        if spatialref:
+            layerproj = spatialref.ExportToProj4()
+        else:
+            layerproj = None
         layername = layer.GetName()
         layerfcount = str(layer.GetFeatureCount())
         layerextentraw = strip(str(layer.GetExtent()),"()")
@@ -247,7 +255,11 @@ def processvds(vector, countervds,currentpath):
         # reorder to llx, lly, urx, ury
         layerextent = (le[0], le[2], le[1], le[3])
         layerftype = featureTypeName(layer.GetLayerDefn().GetGeomType())
-        latlon_extent = extentToLatLon(layerextent, layerproj)
+
+        if layerproj:
+            latlon_extent = extentToLatLon(layerextent, layerproj)
+        else:
+            latlon_extent = None
 
         # the following throws all the attributes into dictionaries of attributes, 
         # some of which are other dictionaries
@@ -288,15 +300,29 @@ def processvds(vector, countervds,currentpath):
 
     return resultsvector,resultsFileStats
 
-def featureTypeName(inttype):
-    # Converts integer feature type to name (e.g. 1 = Point)
-    ftype = ''
-    if (inttype == ogr.wkbPoint): ftype = 'POINT'
-    elif (inttype == ogr.wkbLineString): ftype = 'LINE'
-    elif (inttype == ogr.wkbPolygon): ftype = 'POLYGON'
-    elif (inttype == 0): ftype = 'UNKNOWN'
-    else: print "-----Ftype conversion failure"
-    return ftype
+def featureTypeName( type ):
+    if type == ogr.wkbUnknown:
+        return 'Unknown'
+    elif type == ogr.wkbPoint:
+        return 'Point'
+    elif type == ogr.wkbLineString:
+        return 'LineString'
+    elif type == ogr.wkbPolygon:
+        return 'Polygon'
+    elif type == ogr.wkbMultiPoint:
+        return 'MultiPoint'
+    elif type == ogr.wkbMultiLineString:
+        return 'MultiLineString'
+    elif type == ogr.wkbMultiPolygon:
+        return 'MultiPolygon'
+    elif type == ogr.wkbGeometryCollection:
+        return 'GeometryCollection'
+    elif type == ogr.wkbNone:
+        return 'None'
+    elif type == ogr.wkbLinearRing:
+        return 'LinearRing'
+    else:
+        return 'Unknown'
 
 def outputvector(resultsvector, counterraster, countervds, resultsFileStats,xmlroot):
     xmlvector = appendXML(xmlroot, "VectorData")
