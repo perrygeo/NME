@@ -17,6 +17,7 @@
 # 8-JAN-08 - added rudimentary vector output
 # 16-JAN-08 - renamed outputs entities, added higher level elements/summary stats
 # 12-FEB-08 - Added bad hack to output INSERT statements if you add 2nd argument in command "SQL".  e.g. python gdalogr_catalogue.py ../ SQL | grep INSERT - hacked for Markus :)
+# 25-MAR-12 - Rework arg handling a bit, made indentation consistent, 
 
 '''
 TODO
@@ -174,9 +175,29 @@ def processraster(raster, counterraster, currentpath):
         resultseachband = {'bandId': str(bandnum+1), 'min': str(min),'max': str(max), 'overviews': str(overviews)}
         resultseachbandShort = {'bandId': bandnum+1, 'min': min,'max': max, 'overviews': str(overviews)}
         resultsbands[str(bandnum+1)] = resultseachband
-        if options.printSql: print sqlOutput('band',resultseachbandShort)
-    resultsraster = { 'bands': resultsbands, 'rasterId': str(counterraster), 'name': rastername, 'bandcount': str(bandcount), 'geotrans': str(geotrans), 'driver': str(driver), 'rasterX': str(rasterx), 'rasterY': str(rastery), 'projection': wkt}
-    resultsrasterShort =  {'rasterId':counterraster, 'name': rastername, 'bandcount': bandcount, 'geotrans': str(geotrans), 'driver': driver, 'rasterX': rasterx, 'rasterY': rastery, 'projection': wkt}
+        if options.printSql: 
+            print sqlOutput('band',resultseachbandShort)
+    resultsraster = { 
+            'bands': resultsbands, 
+            'rasterId': str(counterraster), 
+            'name': rastername, 
+            'bandcount': str(bandcount), 
+            'geotrans': str(geotrans), 
+            'driver': str(driver), 
+            'rasterX': str(rasterx), 
+            'rasterY': str(rastery), 
+            'projection': wkt
+    }
+    resultsrasterShort =  {
+            'rasterId':counterraster, 
+            'name': rastername, 
+            'bandcount': bandcount, 
+            'geotrans': str(geotrans), 
+            'driver': driver, 
+            'rasterX': rasterx, 
+            'rasterY': rastery, 
+            'projection': wkt
+    }
     if options.printSql: print sqlOutput('raster',resultsrasterShort)
     #Mapping(raster,extent,rastername,'RASTER') # mapping test
     return resultsraster, resultsFileStats
@@ -202,6 +223,7 @@ def processvds(vector, countervds,currentpath):
     resultsFileStats = fileStats(currentpath)
     for layernum in range(vdslayercount): #process all layers
         layer = vector.GetLayer(layernum)
+        layerproj = layer.GetSpatialRef().ExportToProj4()
         layername = layer.GetName()
         layerfcount = str(layer.GetFeatureCount())
         layerextentraw = strip(str(layer.GetExtent()),"()")
@@ -214,16 +236,33 @@ def processvds(vector, countervds,currentpath):
         # resultsvds = datasource attributes
         # resultsvector = dict of datasource attributes, plus a dict of all layers
         # Note all get saved as strings, which isn't what you'd want for SQL output
-        resultseachlayer = {'layerId': str(layernum+1), 'name': layername, 'featuretype': str(layerftype), 'featurecount': str(layerfcount), 'extent': layerextentraw}
+        resultseachlayer = {
+            'layerId': str(layernum+1), 
+            'name': layername, 
+            'proj': layerproj, 
+            'featuretype': str(layerftype), 
+            'featurecount': str(layerfcount), 
+            'extent': layerextentraw
+        }
         resultslayers[str(layernum+1)] = resultseachlayer
-        sqlstringvlay = "INSERT INTO layer %s VALUES %s;" % (('layerId','datasourceId','name','featurecount','extent'), (layernum+1,countervds,layername,int(layerfcount),layerextentraw))
+        sqlstringvlay = "INSERT INTO layer %s VALUES %s;" % (
+                ('layerId','datasourceId','name','featurecount','extent'), 
+                (layernum+1,countervds,layername,int(layerfcount),layerextentraw))
         if options.printSql: print sqlOutput('layer',resultseachlayer)
         #if (layerftype <> 'UNKNOWN'):
         #    Mapping(vector,layerextentraw,layername,layerftype) # mapping test
-    resultsvds = { 'datasourceId': str(countervds), 'name': vdsname, 'format': vdsformat, 'layercount': str(vdslayercount) }
-    sqlstringvds = "INSERT INTO datasource %s VALUES %s;" % (('datasourceId','name','format','layercount'), (countervds, vdsname, vdsformat, int(vdslayercount)))
+    resultsvds = { 
+            'datasourceId': str(countervds), 
+            'name': vdsname, 
+            'format': vdsformat, 
+            'layercount': str(vdslayercount) 
+    }
+    sqlstringvds = "INSERT INTO datasource %s VALUES %s;" % (
+            ('datasourceId','name','format','layercount'), 
+            (countervds, vdsname, vdsformat, int(vdslayercount)))
     resultsvector = { 'resultsvds': resultsvds, 'resultslayers': resultslayers } 
-    if options.printSql: print sqlOutput('dataset',resultsvds)
+    if options.printSql: 
+        print sqlOutput('dataset',resultsvds)
 
     return resultsvector,resultsFileStats
 
