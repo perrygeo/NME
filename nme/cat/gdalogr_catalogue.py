@@ -51,11 +51,6 @@ from xmlgen import XMLWriter
 #from mapscript import *
 #from time import time
 
-def Usage():
-    print 'Usage: gdalogr_catalogue.py directory [SQL]'
-    print
-    sys.exit(1)
-
 def startup(startpath):
     gdal.PushErrorHandler()
     skiplist = ['.svn','.shx','.dbf']
@@ -76,7 +71,7 @@ def startup(startpath):
                 raster,vector = tryopends(currentdir)
                 if raster:
                     counterraster += 1
-                    print counterraster
+                    #print counterraster
                     resultsraster,resultsFileStats = processraster(raster,counterraster,currentdir)
                     xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
                 if vector:
@@ -161,11 +156,14 @@ def processraster(raster, counterraster, currentpath):
     rastername = raster.GetDescription()
     bandcount = raster.RasterCount
     geotrans = strip(str(raster.GetGeoTransform()),"()")
+    geotrans = [float(strip(x)) for x in geotrans.split(",")]
     driver = raster.GetDriver().LongName
     rasterx = raster.RasterXSize
     rastery = raster.RasterYSize
     wkt = raster.GetProjection()
-    #extent = (geotrans[0]), (geotrans[3]), (geotrans[0] + ( geotrans[1] * rasterx )), (geotrans[3] + ( geotrans[5] * rastery ))
+    proj = raster.GetProjection().ExportToProj4()
+    extent = (geotrans[0]), (geotrans[3]), (geotrans[0] + ( geotrans[1] * rasterx )), (geotrans[3] + ( geotrans[5] * rastery ))
+
     resultsbands = {}
     resultsFileStats = fileStats(currentpath)
     for bandnum in range(bandcount):
@@ -186,7 +184,9 @@ def processraster(raster, counterraster, currentpath):
             'driver': str(driver), 
             'rasterX': str(rasterx), 
             'rasterY': str(rastery), 
-            'projection': wkt
+            'projection': wkt,
+            'proj': proj,
+            'extent': str(extent)
     }
     resultsrasterShort =  {
             'rasterId':counterraster, 
@@ -198,7 +198,8 @@ def processraster(raster, counterraster, currentpath):
             'rasterY': rastery, 
             'projection': wkt
     }
-    if options.printSql: print sqlOutput('raster',resultsrasterShort)
+    if options.printSql: 
+        print sqlOutput('raster',resultsrasterShort)
     #Mapping(raster,extent,rastername,'RASTER') # mapping test
     return resultsraster, resultsFileStats
   
@@ -248,7 +249,8 @@ def processvds(vector, countervds,currentpath):
         sqlstringvlay = "INSERT INTO layer %s VALUES %s;" % (
                 ('layerId','datasourceId','name','featurecount','extent'), 
                 (layernum+1,countervds,layername,int(layerfcount),layerextentraw))
-        if options.printSql: print sqlOutput('layer',resultseachlayer)
+        if options.printSql: 
+            print sqlOutput('layer',resultseachlayer)
         #if (layerftype <> 'UNKNOWN'):
         #    Mapping(vector,layerextentraw,layername,layerftype) # mapping test
     resultsvds = { 
