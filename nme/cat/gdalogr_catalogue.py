@@ -161,7 +161,9 @@ def processraster(raster, counterraster, currentpath):
     rasterx = raster.RasterXSize
     rastery = raster.RasterYSize
     wkt = raster.GetProjection()
-    proj = raster.GetProjection().ExportToProj4()
+    srs = osr.SpatialReference()
+    srs.ImportFromWkt(wkt)
+    proj = srs.ExportToProj4()
     extent = (geotrans[0]), (geotrans[3]), (geotrans[0] + ( geotrans[1] * rasterx )), (geotrans[3] + ( geotrans[5] * rastery ))
 
     resultsbands = {}
