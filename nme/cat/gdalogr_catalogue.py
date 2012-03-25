@@ -57,19 +57,16 @@ def Usage():
 
 # Argument processing
 #if len(sys.argv) > 1:
-#  directory = sys.argv[1]
-#  if len(sys.argv) > 2:
+#  directory = sys.argv[1] #  if len(sys.argv) > 2:
 #    if sys.argv[2] == "SQL":
 #      printSql = True
 #  else: printSql = False
 #else:
 #  Usage()
 
-def startup():
-  #directory = sys.argv[1]
+def startup(startpath):
   gdal.PushErrorHandler()
   skiplist = ['.svn','.shx','.dbf']
-  startpath = options.directory
   pathwalker = os.walk(startpath)
   walkers = itertools.tee(pathwalker)
   counterraster = 0
@@ -398,7 +395,7 @@ class Mapping:
 
 if __name__ == '__main__':
   from optparse import OptionParser, OptionGroup
-  parser = OptionParser()
+  parser = OptionParser(usage="gdalogr_catalog.py [options] -d /path/to/search")
   parser.add_option("-d","--dir", action="store", type="string", dest="directory", help="Top level folder to start scanning from")
   parser.add_option("-f","--file", action="store", type="string", dest="logfile", help="Output log file (not written to stdout)" )
   group = OptionGroup(parser, "Hack Options", "May not function without advanced knowledge")
@@ -407,12 +404,19 @@ if __name__ == '__main__':
   parser.add_option_group(group)
   (options, args) = parser.parse_args()
 
+  startpath = options.directory
+  if not startpath and len(args) >= 1:
+    startpath = args[0]
+
+  if not startpath or not os.path.exists(startpath):
+    parser.error("Please supply an valid search directory")
+
   from xml.etree.ElementTree import Element, SubElement
   import xml.etree.ElementTree as ET
 
   from ElementTree_pretty import prettify
   xmlroot = startXML()
-  startup()
+  startup(startpath)
   writeXML(xmlroot)
   if options.pretty: print prettify(xmlroot)
 
