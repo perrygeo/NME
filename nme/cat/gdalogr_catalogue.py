@@ -129,9 +129,9 @@ def appendXML(elementroot, subelement, subelstring=None):
     newelement.text = subelstring
     return newelement
 
-def writeXML(xmlroot):
+def writeXML(xmlroot, outfile):
     xmltree = ET.ElementTree(xmlroot)
-    xmltree.write(options.logfile)
+    xmltree.write(outfile)
 
 def skipfile(filepath, skiplist):
     skipstatus = None
@@ -382,10 +382,9 @@ if __name__ == '__main__':
     from optparse import OptionParser, OptionGroup
     parser = OptionParser(usage="gdalogr_catalog.py [options] -d /path/to/search")
     parser.add_option("-d","--dir", action="store", type="string", dest="directory", help="Top level folder to start scanning from")
-    parser.add_option("-f","--file", action="store", type="string", dest="logfile", help="Output log file (not written to stdout)" )
+    parser.add_option("-f","--file", action="store", type="string", dest="outfile", help="Output file (if specified, no stdout)" )
     group = OptionGroup(parser, "Hack Options", "May not function without advanced knowledge")
     group.add_option("-s","--sql", action="store_true", dest="printSql", help="Output results in SQL INSERT statements instead of XML")
-    group.add_option("-p","--pretty", action="store_true", dest="pretty", help="Print easy to read XML to stdout")
     parser.add_option_group(group)
     (options, args) = parser.parse_args()
 
@@ -402,7 +401,7 @@ if __name__ == '__main__':
     from ElementTree_pretty import prettify
     xmlroot = startXML()
     startup(startpath)
-    writeXML(xmlroot)
-    if options.pretty: 
+    if options.outfile:
+        writeXML(xmlroot, options.outfile)
+    else:
         print prettify(xmlroot)
-
