@@ -152,6 +152,15 @@ def tryopends(filepath):
         dsogr = False #return False
     return dsgdal, dsogr
 
+def extentToLatLon(extent, proj):
+    from pyproj import Proj
+    p1 = Proj(proj, preserve_units=True) 
+    if p1.is_latlong():
+        return extent
+    x1,y1 = p1(extent[0], extent[1], inverse=True)
+    x2,y2 = p1(extent[2], extent[3], inverse=True)
+    return x1, y1, x2, y2
+
 def processraster(raster, counterraster, currentpath):
     rastername = raster.GetDescription()
     bandcount = raster.RasterCount
@@ -164,15 +173,10 @@ def processraster(raster, counterraster, currentpath):
     srs = osr.SpatialReference()
     srs.ImportFromWkt(wkt)
     proj = srs.ExportToProj4()
-    extent = (geotrans[0]), (geotrans[3]), (geotrans[0] + ( geotrans[1] * rasterx )), (geotrans[3] + ( geotrans[5] * rastery ))
 
-    latlon = osr.SpatialReference()
-    latlon.ImportFromEPSG(4326)
-    import ipdb; ipdb.set_trace()
-    #latlon.ImportFromEPSG(4326)
-    for coord in extent:
-
-
+    # llx, lly, urx, ury
+    extent = (geotrans[0], geotrans[3] + (geotrans[5] * rastery), geotrans[0] + ( geotrans[1] * rasterx ), geotrans[3], )
+    latlon_extent = extentToLatLon(extent, proj)
 
     resultsbands = {}
     resultsFileStats = fileStats(currentpath)
@@ -196,6 +200,7 @@ def processraster(raster, counterraster, currentpath):
             'rasterY': str(rastery), 
             'projection': wkt,
             'proj': proj,
+            'latlonextent': strip(str(latlon_extent),"()"),
             'extent': str(extent)
     }
     resultsrasterShort =  {
@@ -238,7 +243,11 @@ def processvds(vector, countervds,currentpath):
         layername = layer.GetName()
         layerfcount = str(layer.GetFeatureCount())
         layerextentraw = strip(str(layer.GetExtent()),"()")
+        le = [float(x) for x in layerextentraw.split(',')]
+        # reorder to llx, lly, urx, ury
+        layerextent = (le[0], le[2], le[1], le[3])
         layerftype = featureTypeName(layer.GetLayerDefn().GetGeomType())
+        latlon_extent = extentToLatLon(layerextent, layerproj)
 
         # the following throws all the attributes into dictionaries of attributes, 
         # some of which are other dictionaries
@@ -253,7 +262,8 @@ def processvds(vector, countervds,currentpath):
             'proj': layerproj, 
             'featuretype': str(layerftype), 
             'featurecount': str(layerfcount), 
-            'extent': layerextentraw
+            'extent': strip(str(layerextent),"()"),
+            'latlonextent': strip(str(latlon_extent),"()"),
         }
         resultslayers[str(layernum+1)] = resultseachlayer
         sqlstringvlay = "INSERT INTO layer %s VALUES %s;" % (
