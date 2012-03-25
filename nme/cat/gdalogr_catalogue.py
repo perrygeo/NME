@@ -166,6 +166,14 @@ def processraster(raster, counterraster, currentpath):
     proj = srs.ExportToProj4()
     extent = (geotrans[0]), (geotrans[3]), (geotrans[0] + ( geotrans[1] * rasterx )), (geotrans[3] + ( geotrans[5] * rastery ))
 
+    latlon = osr.SpatialReference()
+    latlon.ImportFromEPSG(4326)
+    import ipdb; ipdb.set_trace()
+    #latlon.ImportFromEPSG(4326)
+    for coord in extent:
+
+
+
     resultsbands = {}
     resultsFileStats = fileStats(currentpath)
     for bandnum in range(bandcount):
