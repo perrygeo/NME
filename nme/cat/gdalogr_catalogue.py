@@ -65,181 +65,181 @@ def Usage():
 #  Usage()
 
 def startup(startpath):
-  gdal.PushErrorHandler()
-  skiplist = ['.svn','.shx','.dbf']
-  pathwalker = os.walk(startpath)
-  walkers = itertools.tee(pathwalker)
-  counterraster = 0
-  countervds = 0
+    gdal.PushErrorHandler()
+    skiplist = ['.svn','.shx','.dbf']
+    pathwalker = os.walk(startpath)
+    walkers = itertools.tee(pathwalker)
+    counterraster = 0
+    countervds = 0
 
 #  walkerlist = list(copy.pathwalker)
-  processStats(walkers[1], skiplist, startpath,xmlroot)
-  for eachpath in walkers[0]:
-    startdir = eachpath[0]
-    alldirs = eachpath[1]
-    allfiles = eachpath[2]
-    for eachdir in alldirs:
-      currentdir = os.path.join(startdir,eachdir)
-      #print currentdir
-      raster,vector = tryopends(currentdir)
-      if (not skipfile(currentdir,skiplist) and tryopends(currentdir)):
+    processStats(walkers[1], skiplist, startpath,xmlroot)
+    for eachpath in walkers[0]:
+        startdir = eachpath[0]
+        alldirs = eachpath[1]
+        allfiles = eachpath[2]
+        for eachdir in alldirs:
+        currentdir = os.path.join(startdir,eachdir)
+        #print currentdir
         raster,vector = tryopends(currentdir)
-        if raster:
-          counterraster += 1
-          print counterraster
-          resultsraster,resultsFileStats = processraster(raster,counterraster,currentdir)
-          xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
-        if vector:
- #         resultsFileStats = fileStats(currentdir)
- #         statfileStats = outputFileStats(writer, resultsFileStats)
-          countervds += 1
-          resultsvds,resultsFileStats = processvds(vector,countervds,currentdir)
-          xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats, xmlroot)
-    for eachfile in allfiles:
-      currentfile = "/".join([startdir, eachfile])
-      #print "Current file" + currentfile
-      if (not skipfile(currentfile,skiplist) and tryopends(currentfile)):
-        raster, vector = tryopends(currentfile)
-        if raster:
-          counterraster += 1
-          resultsraster,resultsFileStats = processraster(raster, counterraster, currentfile)
-          xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats,xmlroot)
-        if vector:
-          if (not skipfile(vector.GetName(),skiplist)):
- #         resultsFileStats = fileStats(currentfile)
- #         statfileStats = outputFileStats(writer, resultsFileStats)
+        if (not skipfile(currentdir,skiplist) and tryopends(currentdir)):
+            raster,vector = tryopends(currentdir)
+            if raster:
+            counterraster += 1
+            print counterraster
+            resultsraster,resultsFileStats = processraster(raster,counterraster,currentdir)
+            xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
+            if vector:
+    #         resultsFileStats = fileStats(currentdir)
+    #         statfileStats = outputFileStats(writer, resultsFileStats)
             countervds += 1
-            resultsvds,resultsFileStats = processvds(vector, countervds, currentfile)
-            xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats,xmlroot)
+            resultsvds,resultsFileStats = processvds(vector,countervds,currentdir)
+            xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats, xmlroot)
+        for eachfile in allfiles:
+        currentfile = "/".join([startdir, eachfile])
+        #print "Current file" + currentfile
+        if (not skipfile(currentfile,skiplist) and tryopends(currentfile)):
+            raster, vector = tryopends(currentfile)
+            if raster:
+            counterraster += 1
+            resultsraster,resultsFileStats = processraster(raster, counterraster, currentfile)
+            xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats,xmlroot)
+            if vector:
+            if (not skipfile(vector.GetName(),skiplist)):
+    #         resultsFileStats = fileStats(currentfile)
+    #         statfileStats = outputFileStats(writer, resultsFileStats)
+                countervds += 1
+                resultsvds,resultsFileStats = processvds(vector, countervds, currentfile)
+                xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats,xmlroot)
 
 def processStats(walkerlist, skiplist, startpath, xmlroot):
-  from time import asctime
-  #walkerList = list(pathwalker)
-  dirlist, filelist = [], []
-  for entry in walkerlist:
-    dirlist += entry[1]
-    filelist += entry[2]
- 
-  xmlcatalog = appendXML(xmlroot, "CatalogueProcess")
-  appendXML(xmlcatalog, "SearchPath", startpath)
-  appendXML(xmlcatalog, "LaunchPath", os.getcwd())
-  appendXML(xmlcatalog, "UserHome", os.getenv("HOME"))
-  appendXML(xmlcatalog, "IgnoredStrings", str(skiplist))
-  appendXML(xmlcatalog, "DirCount", str(len(dirlist)))
-  appendXML(xmlcatalog, "FileCount", str(len(filelist)))
-  appendXML(xmlcatalog, "Timestamp", asctime())
-  
-  if options.printSql: 
-    processValues = {'SearchPath':startpath,'LaunchPath':os.getcwd(),'UserHome':os.getenv("HOME"),'IgnoredString':" ".join(map(str, skiplist)),'DirCount':int(len(dirlist)),'FileCount':int(len(filelist)),'Timestamp':asctime()}
-    print sqlOutput('process',processValues)
+    from time import asctime
+    #walkerList = list(pathwalker)
+    dirlist, filelist = [], []
+    for entry in walkerlist:
+        dirlist += entry[1]
+        filelist += entry[2]
+    
+    xmlcatalog = appendXML(xmlroot, "CatalogueProcess")
+    appendXML(xmlcatalog, "SearchPath", startpath)
+    appendXML(xmlcatalog, "LaunchPath", os.getcwd())
+    appendXML(xmlcatalog, "UserHome", os.getenv("HOME"))
+    appendXML(xmlcatalog, "IgnoredStrings", str(skiplist))
+    appendXML(xmlcatalog, "DirCount", str(len(dirlist)))
+    appendXML(xmlcatalog, "FileCount", str(len(filelist)))
+    appendXML(xmlcatalog, "Timestamp", asctime())
+    
+    if options.printSql: 
+        processValues = {'SearchPath':startpath,'LaunchPath':os.getcwd(),'UserHome':os.getenv("HOME"),'IgnoredString':" ".join(map(str, skiplist)),'DirCount':int(len(dirlist)),'FileCount':int(len(filelist)),'Timestamp':asctime()}
+        print sqlOutput('process',processValues)
 
 def startXML():
-  xmlroot = ET.Element("DataCatalogue")
-  return xmlroot
+    xmlroot = ET.Element("DataCatalogue")
+    return xmlroot
 
 def appendXML(elementroot, subelement, subelstring=None):
-  newelement = ET.SubElement(elementroot, subelement)
-  newelement.text = subelstring
-  return newelement
+    newelement = ET.SubElement(elementroot, subelement)
+    newelement.text = subelstring
+    return newelement
 
 def writeXML(xmlroot):
-  xmltree = ET.ElementTree(xmlroot)
-  xmltree.write(options.logfile)
+    xmltree = ET.ElementTree(xmlroot)
+    xmltree.write(options.logfile)
 
 def skipfile(filepath, skiplist):
-  skipstatus = None
-  for skipitem in skiplist:
-    if filepath.find(skipitem) > 0: 
-      skipstatus = True
-      return True
-    else:
-      skipstatus = False
-  return skipstatus
+    skipstatus = None
+    for skipitem in skiplist:
+        if filepath.find(skipitem) > 0: 
+        skipstatus = True
+        return True
+        else:
+        skipstatus = False
+    return skipstatus
   
 def tryopends(filepath):
-  dsogr, dsgdal = False, False
-  try:
-    #print "trying" + filepath
-    dsgdal = gdal.OpenShared(filepath)
-  except gdal.GDALError:
-    dsgdal = False #return False
-  try:
-    dsogr = ogr.OpenShared(filepath)
-  except ogr.OGRError:
-    dsogr = False #return False
-  return dsgdal, dsogr
+    dsogr, dsgdal = False, False
+    try:
+        #print "trying" + filepath
+        dsgdal = gdal.OpenShared(filepath)
+    except gdal.GDALError:
+        dsgdal = False #return False
+    try:
+        dsogr = ogr.OpenShared(filepath)
+    except ogr.OGRError:
+        dsogr = False #return False
+    return dsgdal, dsogr
 
 def processraster(raster, counterraster, currentpath):
-  rastername = raster.GetDescription()
-  bandcount = raster.RasterCount
-  geotrans = strip(str(raster.GetGeoTransform()),"()")
-  driver = raster.GetDriver().LongName
-  rasterx = raster.RasterXSize
-  rastery = raster.RasterYSize
-  wkt = raster.GetProjection()
-  #extent = (geotrans[0]), (geotrans[3]), (geotrans[0] + ( geotrans[1] * rasterx )), (geotrans[3] + ( geotrans[5] * rastery ))
-  resultsbands = {}
-  resultsFileStats = fileStats(currentpath)
-  for bandnum in range(bandcount):
-    band = raster.GetRasterBand(bandnum+1)
-    min, max = band.ComputeRasterMinMax()
-    overviews = band.GetOverviewCount()
-    resultseachband = {'bandId': str(bandnum+1), 'min': str(min),'max': str(max), 'overviews': str(overviews)}
-    resultseachbandShort = {'bandId': bandnum+1, 'min': min,'max': max, 'overviews': str(overviews)}
-    resultsbands[str(bandnum+1)] = resultseachband
-    if options.printSql: print sqlOutput('band',resultseachbandShort)
-  resultsraster = { 'bands': resultsbands, 'rasterId': str(counterraster), 'name': rastername, 'bandcount': str(bandcount), 'geotrans': str(geotrans), 'driver': str(driver), 'rasterX': str(rasterx), 'rasterY': str(rastery), 'projection': wkt}
-  resultsrasterShort =  {'rasterId':counterraster, 'name': rastername, 'bandcount': bandcount, 'geotrans': str(geotrans), 'driver': driver, 'rasterX': rasterx, 'rasterY': rastery, 'projection': wkt}
-  if options.printSql: print sqlOutput('raster',resultsrasterShort)
-  #Mapping(raster,extent,rastername,'RASTER') # mapping test
-  return resultsraster, resultsFileStats
+    rastername = raster.GetDescription()
+    bandcount = raster.RasterCount
+    geotrans = strip(str(raster.GetGeoTransform()),"()")
+    driver = raster.GetDriver().LongName
+    rasterx = raster.RasterXSize
+    rastery = raster.RasterYSize
+    wkt = raster.GetProjection()
+    #extent = (geotrans[0]), (geotrans[3]), (geotrans[0] + ( geotrans[1] * rasterx )), (geotrans[3] + ( geotrans[5] * rastery ))
+    resultsbands = {}
+    resultsFileStats = fileStats(currentpath)
+    for bandnum in range(bandcount):
+        band = raster.GetRasterBand(bandnum+1)
+        min, max = band.ComputeRasterMinMax()
+        overviews = band.GetOverviewCount()
+        resultseachband = {'bandId': str(bandnum+1), 'min': str(min),'max': str(max), 'overviews': str(overviews)}
+        resultseachbandShort = {'bandId': bandnum+1, 'min': min,'max': max, 'overviews': str(overviews)}
+        resultsbands[str(bandnum+1)] = resultseachband
+        if options.printSql: print sqlOutput('band',resultseachbandShort)
+    resultsraster = { 'bands': resultsbands, 'rasterId': str(counterraster), 'name': rastername, 'bandcount': str(bandcount), 'geotrans': str(geotrans), 'driver': str(driver), 'rasterX': str(rasterx), 'rasterY': str(rastery), 'projection': wkt}
+    resultsrasterShort =  {'rasterId':counterraster, 'name': rastername, 'bandcount': bandcount, 'geotrans': str(geotrans), 'driver': driver, 'rasterX': rasterx, 'rasterY': rastery, 'projection': wkt}
+    if options.printSql: print sqlOutput('raster',resultsrasterShort)
+    #Mapping(raster,extent,rastername,'RASTER') # mapping test
+    return resultsraster, resultsFileStats
   
 def outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot):
-  xmlraster = appendXML(xmlroot, "RasterData")
+    xmlraster = appendXML(xmlroot, "RasterData")
 
-  statfileStats = outputFileStats(resultsFileStats, xmlraster)
-  for rasteritem, rastervalue in resultsraster.iteritems(): # for each raster attribute
-    if rasteritem <> 'bands':
-      appendXML(xmlraster, rasteritem, rastervalue)
-    if rasteritem == 'bands':
-      for banditem, bandvalue in rastervalue.iteritems(): # for each band
-	xmlband = appendXML(xmlraster, "RasterBand")
-        for banditemdetails, bandvaluedetails in bandvalue.iteritems():
-	  appendXML(xmlband, banditemdetails, bandvaluedetails)
-  return True
+    statfileStats = outputFileStats(resultsFileStats, xmlraster)
+    for rasteritem, rastervalue in resultsraster.iteritems(): # for each raster attribute
+        if rasteritem <> 'bands':
+        appendXML(xmlraster, rasteritem, rastervalue)
+        if rasteritem == 'bands':
+        for banditem, bandvalue in rastervalue.iteritems(): # for each band
+        xmlband = appendXML(xmlraster, "RasterBand")
+            for banditemdetails, bandvaluedetails in bandvalue.iteritems():
+        appendXML(xmlband, banditemdetails, bandvaluedetails)
+    return True
 
 def processvds(vector, countervds,currentpath):
-  vdsname = vector.GetName()
-  vdsformat = vector.GetDriver().GetName()
-  vdslayercount = vector.GetLayerCount()
-  resultslayers = {}
-  resultsFileStats = fileStats(currentpath)
-  for layernum in range(vdslayercount): #process all layers
-    layer = vector.GetLayer(layernum)
-    layername = layer.GetName()
-    layerfcount = str(layer.GetFeatureCount())
-    layerextentraw = strip(str(layer.GetExtent()),"()")
-    layerftype = featureTypeName(layer.GetLayerDefn().GetGeomType())
+    vdsname = vector.GetName()
+    vdsformat = vector.GetDriver().GetName()
+    vdslayercount = vector.GetLayerCount()
+    resultslayers = {}
+    resultsFileStats = fileStats(currentpath)
+    for layernum in range(vdslayercount): #process all layers
+        layer = vector.GetLayer(layernum)
+        layername = layer.GetName()
+        layerfcount = str(layer.GetFeatureCount())
+        layerextentraw = strip(str(layer.GetExtent()),"()")
+        layerftype = featureTypeName(layer.GetLayerDefn().GetGeomType())
 
-    # the following throws all the attributes into dictionaries of attributes, 
-    # some of which are other dictionaries
-    # resultseachlayer = 1 layer attributes
-    # resultslayers = dict. of all layers and their attributes
-    # resultsvds = datasource attributes
-    # resultsvector = dict of datasource attributes, plus a dict of all layers
-    # Note all get saved as strings, which isn't what you'd want for SQL output
-    resultseachlayer = {'layerId': str(layernum+1), 'name': layername, 'featuretype': str(layerftype), 'featurecount': str(layerfcount), 'extent': layerextentraw}
-    resultslayers[str(layernum+1)] = resultseachlayer
-    sqlstringvlay = "INSERT INTO layer %s VALUES %s;" % (('layerId','datasourceId','name','featurecount','extent'), (layernum+1,countervds,layername,int(layerfcount),layerextentraw))
-    if options.printSql: print sqlOutput('layer',resultseachlayer)
-    #if (layerftype <> 'UNKNOWN'):
-    #    Mapping(vector,layerextentraw,layername,layerftype) # mapping test
-  resultsvds = { 'datasourceId': str(countervds), 'name': vdsname, 'format': vdsformat, 'layercount': str(vdslayercount) }
-  sqlstringvds = "INSERT INTO datasource %s VALUES %s;" % (('datasourceId','name','format','layercount'), (countervds, vdsname, vdsformat, int(vdslayercount)))
-  resultsvector = { 'resultsvds': resultsvds, 'resultslayers': resultslayers } 
-  if options.printSql: print sqlOutput('dataset',resultsvds)
+        # the following throws all the attributes into dictionaries of attributes, 
+        # some of which are other dictionaries
+        # resultseachlayer = 1 layer attributes
+        # resultslayers = dict. of all layers and their attributes
+        # resultsvds = datasource attributes
+        # resultsvector = dict of datasource attributes, plus a dict of all layers
+        # Note all get saved as strings, which isn't what you'd want for SQL output
+        resultseachlayer = {'layerId': str(layernum+1), 'name': layername, 'featuretype': str(layerftype), 'featurecount': str(layerfcount), 'extent': layerextentraw}
+        resultslayers[str(layernum+1)] = resultseachlayer
+        sqlstringvlay = "INSERT INTO layer %s VALUES %s;" % (('layerId','datasourceId','name','featurecount','extent'), (layernum+1,countervds,layername,int(layerfcount),layerextentraw))
+        if options.printSql: print sqlOutput('layer',resultseachlayer)
+        #if (layerftype <> 'UNKNOWN'):
+        #    Mapping(vector,layerextentraw,layername,layerftype) # mapping test
+    resultsvds = { 'datasourceId': str(countervds), 'name': vdsname, 'format': vdsformat, 'layercount': str(vdslayercount) }
+    sqlstringvds = "INSERT INTO datasource %s VALUES %s;" % (('datasourceId','name','format','layercount'), (countervds, vdsname, vdsformat, int(vdslayercount)))
+    resultsvector = { 'resultsvds': resultsvds, 'resultslayers': resultslayers } 
+    if options.printSql: print sqlOutput('dataset',resultsvds)
 
-  return resultsvector,resultsFileStats
+    return resultsvector,resultsFileStats
 
 def featureTypeName(inttype):
     # Converts integer feature type to name (e.g. 1 = Point)
@@ -252,20 +252,20 @@ def featureTypeName(inttype):
     return ftype
 
 def outputvector(resultsvector, counterraster, countervds, resultsFileStats,xmlroot):
-  xmlvector = appendXML(xmlroot, "VectorData")
-  statfileStats = outputFileStats(resultsFileStats, xmlvector)
-  for vectoritem, vectorvalue in resultsvector.iteritems(): # resultsvector includes two dictionaries
-    if vectoritem <> 'resultslayers':
-      for vectordsitem, vectordsvalue in vectorvalue.iteritems(): # vectorvalue contains datasource attributes
-	appendXML(xmlvector, vectordsitem, vectordsvalue)
+    xmlvector = appendXML(xmlroot, "VectorData")
+    statfileStats = outputFileStats(resultsFileStats, xmlvector)
+    for vectoritem, vectorvalue in resultsvector.iteritems(): # resultsvector includes two dictionaries
+        if vectoritem <> 'resultslayers':
+        for vectordsitem, vectordsvalue in vectorvalue.iteritems(): # vectorvalue contains datasource attributes
+        appendXML(xmlvector, vectordsitem, vectordsvalue)
 
-    if vectoritem == 'resultslayers':
-      for layeritem, layervalue in vectorvalue.iteritems(): # vectorvalue contains a dictionary of the layers
-        xmlvectorlayer = appendXML(xmlvector, "VectorLayer")
+        if vectoritem == 'resultslayers':
+        for layeritem, layervalue in vectorvalue.iteritems(): # vectorvalue contains a dictionary of the layers
+            xmlvectorlayer = appendXML(xmlvector, "VectorLayer")
 
-        for layeritemdetails, layervaluedetails in layervalue.iteritems(): # layervalue contains layer attributes
-	  appendXML(xmlvectorlayer, layeritemdetails, layervaluedetails)
-  return True
+            for layeritemdetails, layervaluedetails in layervalue.iteritems(): # layervalue contains layer attributes
+        appendXML(xmlvectorlayer, layeritemdetails, layervaluedetails)
+    return True
 
 def sqlOutput(tableName, valueDict):
      sqlStatement = "INSERT INTO %s %s VALUES %s;" % (tableName, tuple((valueDict.keys())),tuple(valueDict.values()))
@@ -282,53 +282,53 @@ def sqlCreateTables():
 ### TODO functions below...
 
 def xmlDtdOutput():
-  import zipfiles
-  # output dtd that corresponds to the xml, or is it schema?
+    import zipfiles
+    # output dtd that corresponds to the xml, or is it schema?
 
 def checkZip(currentfile):
-  import zipfiles
-  # check if it can read zips
+    import zipfiles
+    # check if it can read zips
 
 def openZip(currentfile):
-  import zipfiles
-  # extract files and catalogue them
+    import zipfiles
+    # extract files and catalogue them
 
 def fileStats(filepath):
-  mode, ino, dev, nlink, user_id, group_id, file_size, time_accessed, time_modified, time_created = os.stat(filepath)
-  if os.path.isfile(filepath):
-    file_type = "File"
-  else: 
-    file_type = "Directory"
-  try:
-    import pwd # not available on all platforms
-    userinfo = pwd.getpwuid(user_id)
-  except (ImportError, KeyError):
-    user_name = "N/A"
-    user_full_name = "N/A"
-  else:
-    user_name = userinfo[0]
-    user_full_name = userinfo[4]
-  full_path = os.path.abspath(filepath)
-  md5_key = (full_path, user_name, file_size, time_modified, time_created)
-  md5_digest = getMd5HexDigest(md5_key)
-  resultsFileStats = {'fullPath': str(full_path), 'userId': str(user_id), 'groupId': str(group_id), 'fileSize': str(file_size), 'timeAccessed': str(time_accessed), 'timeModified': str(time_modified), 'timeCreated': str(time_created), 'fileType': file_type, 'userName': user_name, 'userFullName': user_full_name, 'uniqueDigest': md5_digest}
-  return resultsFileStats
+    mode, ino, dev, nlink, user_id, group_id, file_size, time_accessed, time_modified, time_created = os.stat(filepath)
+    if os.path.isfile(filepath):
+        file_type = "File"
+    else: 
+        file_type = "Directory"
+    try:
+        import pwd # not available on all platforms
+        userinfo = pwd.getpwuid(user_id)
+    except (ImportError, KeyError):
+        user_name = "N/A"
+        user_full_name = "N/A"
+    else:
+        user_name = userinfo[0]
+        user_full_name = userinfo[4]
+    full_path = os.path.abspath(filepath)
+    md5_key = (full_path, user_name, file_size, time_modified, time_created)
+    md5_digest = getMd5HexDigest(md5_key)
+    resultsFileStats = {'fullPath': str(full_path), 'userId': str(user_id), 'groupId': str(group_id), 'fileSize': str(file_size), 'timeAccessed': str(time_accessed), 'timeModified': str(time_modified), 'timeCreated': str(time_created), 'fileType': file_type, 'userName': user_name, 'userFullName': user_full_name, 'uniqueDigest': md5_digest}
+    return resultsFileStats
 
 def outputFileStats(resultsFileStats, xmlroot):
-  xmlfilestats = appendXML(xmlroot, "FileStats")
-  for statitem, statvalue in resultsFileStats.iteritems():
-    appendXML(xmlfilestats, statitem, statvalue)
-  return True
+    xmlfilestats = appendXML(xmlroot, "FileStats")
+    for statitem, statvalue in resultsFileStats.iteritems():
+        appendXML(xmlfilestats, statitem, statvalue)
+    return True
 
 def outputXml(root,newelement):
-  SubElement(root,newelement)
-  return 
+    SubElement(root,newelement)
+    return 
   
 def getMd5HexDigest(encodeString):
-  import md5
-  m = md5.new()
-  m.update(str(encodeString))
-  return m.hexdigest()
+    import md5
+    m = md5.new()
+    m.update(str(encodeString))
+    return m.hexdigest()
 
 class Mapping:
     def __init__(self,datasource,extent,layername,layerftype):
@@ -394,29 +394,30 @@ class Mapping:
 
 
 if __name__ == '__main__':
-  from optparse import OptionParser, OptionGroup
-  parser = OptionParser(usage="gdalogr_catalog.py [options] -d /path/to/search")
-  parser.add_option("-d","--dir", action="store", type="string", dest="directory", help="Top level folder to start scanning from")
-  parser.add_option("-f","--file", action="store", type="string", dest="logfile", help="Output log file (not written to stdout)" )
-  group = OptionGroup(parser, "Hack Options", "May not function without advanced knowledge")
-  group.add_option("-s","--sql", action="store_true", dest="printSql", help="Output results in SQL INSERT statements instead of XML")
-  group.add_option("-p","--pretty", action="store_true", dest="pretty", help="Print easy to read XML to stdout")
-  parser.add_option_group(group)
-  (options, args) = parser.parse_args()
+    from optparse import OptionParser, OptionGroup
+    parser = OptionParser(usage="gdalogr_catalog.py [options] -d /path/to/search")
+    parser.add_option("-d","--dir", action="store", type="string", dest="directory", help="Top level folder to start scanning from")
+    parser.add_option("-f","--file", action="store", type="string", dest="logfile", help="Output log file (not written to stdout)" )
+    group = OptionGroup(parser, "Hack Options", "May not function without advanced knowledge")
+    group.add_option("-s","--sql", action="store_true", dest="printSql", help="Output results in SQL INSERT statements instead of XML")
+    group.add_option("-p","--pretty", action="store_true", dest="pretty", help="Print easy to read XML to stdout")
+    parser.add_option_group(group)
+    (options, args) = parser.parse_args()
 
-  startpath = options.directory
-  if not startpath and len(args) >= 1:
-    startpath = args[0]
+    startpath = options.directory
+    if not startpath and len(args) >= 1:
+        startpath = args[0]
 
-  if not startpath or not os.path.exists(startpath):
-    parser.error("Please supply an valid search directory")
+    if not startpath or not os.path.exists(startpath):
+        parser.error("Please supply an valid search directory")
 
-  from xml.etree.ElementTree import Element, SubElement
-  import xml.etree.ElementTree as ET
+    from xml.etree.ElementTree import Element, SubElement
+    import xml.etree.ElementTree as ET
 
-  from ElementTree_pretty import prettify
-  xmlroot = startXML()
-  startup(startpath)
-  writeXML(xmlroot)
-  if options.pretty: print prettify(xmlroot)
+    from ElementTree_pretty import prettify
+    xmlroot = startXML()
+    startup(startpath)
+    writeXML(xmlroot)
+    if options.pretty: 
+        print prettify(xmlroot)
 
