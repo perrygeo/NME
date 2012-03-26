@@ -53,7 +53,7 @@ from xmlgen import XMLWriter
 
 def startup(startpath):
     gdal.PushErrorHandler()
-    skiplist = ['.svn','.shx','.dbf']
+    skiplist = ['.svn','.shx','.dbf', '.prj', '.aux.xml']
     pathwalker = os.walk(startpath)
     walkers = itertools.tee(pathwalker)
     counterraster = 0
@@ -66,35 +66,31 @@ def startup(startpath):
         allfiles = eachpath[2]
         for eachdir in alldirs:
             currentdir = os.path.join(startdir,eachdir)
-            raster,vector = tryopends(currentdir)
-            if (not skipfile(currentdir,skiplist) and tryopends(currentdir)):
+            raster,vector = None, None
+            if (not skipfile(currentdir,skiplist)):
                 raster,vector = tryopends(currentdir)
-                if raster:
-                    counterraster += 1
-                    #print counterraster
-                    resultsraster,resultsFileStats = processraster(raster,counterraster,currentdir)
-                    xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
-                if vector:
-                     #resultsFileStats = fileStats(currentdir)
-                     #statfileStats = outputFileStats(writer, resultsFileStats)
-                    countervds += 1
-                    resultsvds,resultsFileStats = processvds(vector,countervds,currentdir)
-                    xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats, xmlroot)
+            if raster:
+                counterraster += 1
+                resultsraster,resultsFileStats = processraster(raster,counterraster,currentdir)
+                xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
+            if vector:
+                countervds += 1
+                resultsvds,resultsFileStats = processvds(vector,countervds,currentdir)
+                xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats, xmlroot)
         for eachfile in allfiles:
             currentfile = "/".join([startdir, eachfile])
-            if (not skipfile(currentfile,skiplist) and tryopends(currentfile)):
+            raster, vector = None, None
+            if (not skipfile(currentfile,skiplist)):
                 raster, vector = tryopends(currentfile)
-                if raster:
-                    counterraster += 1
-                    resultsraster,resultsFileStats = processraster(raster, counterraster, currentfile)
-                    xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats,xmlroot)
-                if vector:
-                    if (not skipfile(vector.GetName(),skiplist)):
-                        #resultsFileStats = fileStats(currentfile)
-                        #statfileStats = outputFileStats(writer, resultsFileStats)
-                        countervds += 1
-                        resultsvds,resultsFileStats = processvds(vector, countervds, currentfile)
-                        xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats,xmlroot)
+            if raster:
+                counterraster += 1
+                resultsraster,resultsFileStats = processraster(raster, counterraster, currentfile)
+                xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats,xmlroot)
+            if vector:
+                if (not skipfile(vector.GetName(),skiplist)):
+                    countervds += 1
+                    resultsvds,resultsFileStats = processvds(vector, countervds, currentfile)
+                    xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats,xmlroot)
 
 def processStats(walkerlist, skiplist, startpath, xmlroot):
     from time import asctime
@@ -141,8 +137,8 @@ def skipfile(filepath, skiplist):
   
 def tryopends(filepath):
     dsogr, dsgdal = False, False
+    sys.stderr.write(" .. trying %s\n" % filepath)
     try:
-        #print "trying" + filepath
         dsgdal = gdal.OpenShared(filepath)
     except gdal.GDALError:
         dsgdal = False #return False
@@ -165,6 +161,7 @@ def extentToLatLon(extent, proj):
 
 def processraster(raster, counterraster, currentpath):
     rastername = raster.GetDescription()
+    sys.stderr.write(rastername + "\n")
     bandcount = raster.RasterCount
     geotrans = strip(str(raster.GetGeoTransform()),"()")
     geotrans = [float(strip(x)) for x in geotrans.split(",")]
@@ -237,6 +234,7 @@ def outputraster(resultsraster, counterraster, countervds, resultsFileStats, xml
 
 def processvds(vector, countervds,currentpath):
     vdsname = vector.GetName()
+    sys.stderr.write(vdsname + "\n")
     vdsformat = vector.GetDriver().GetName()
     vdslayercount = vector.GetLayerCount()
     resultslayers = {}
@@ -404,11 +402,10 @@ def getMd5HexDigest(encodeString):
 
 class Mapping:
     def __init__(self,datasource,extent,layername,layerftype):
-        #from mapscript import *
-	import mapscript
+        import mapscript
         from time import time
         tmap = mapscript.mapObj()
-	print "checkpoint 1"
+        print "checkpoint 1"
         map.setSize(400,400)
         #ext = rectObj(-180,-90,180,90)
         ext = mapscript.rectObj(extent[0],extent[2],extent[1],extent[3]) # some trouble with some bad extents in my test data
@@ -418,15 +415,15 @@ class Mapping:
         lay.name = "Autolayer"
         lay.units = mapscript.MS_DD
         if (layerftype == 'RASTER'):
-		lay.data = datasource.GetDescription()
-	else:
-		lay.data = datasource.GetName()
+            lay.data = datasource.GetDescription()
+        else:
+            lay.data = datasource.GetName()
         print lay.data
         lay.status = mapscript.MS_DEFAULT
         cls = mapscript.classObj(lay)
         sty = mapscript.styleObj()
         col = mapscript.colorObj(0,0,0)
-#        symPoint = mapscript.symbolObj
+        #symPoint = mapscript.symbolObj
         map.setSymbolSet("symbols/symbols_basic.sym")
         if (layerftype == 'POINT'): 
             lay.type = mapscript.MS_LAYER_POINT
