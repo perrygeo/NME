@@ -53,17 +53,19 @@ from xmlgen import XMLWriter
 
 def startup(startpath):
     gdal.PushErrorHandler()
-    skiplist = ['.svn','.shx','.dbf', '.prj', '.aux.xml']
+    skiplist = ['.svn','.shx','.dbf', '.prj', '.aux.xml', '.e00', '.adf']
     pathwalker = os.walk(startpath)
     walkers = itertools.tee(pathwalker)
     counterraster = 0
     countervds = 0
 
-    processStats(walkers[1], skiplist, startpath,xmlroot)
+    processStats(walkers[1], skiplist, startpath, xmlroot)
     for eachpath in walkers[0]:
         startdir = eachpath[0]
         alldirs = eachpath[1]
+        #alldirs = []  #TODO
         allfiles = eachpath[2]
+        #allfiles = []
         for eachdir in alldirs:
             currentdir = os.path.join(startdir,eachdir)
             raster,vector = None, None
@@ -137,15 +139,21 @@ def skipfile(filepath, skiplist):
   
 def tryopends(filepath):
     dsogr, dsgdal = False, False
-    sys.stderr.write(" .. trying %s\n" % filepath)
+    skip_drivers = ['AVCBin',] # GetFeatureCount and Extent are Way too slow and called many times TODO
+
     try:
         dsgdal = gdal.OpenShared(filepath)
     except gdal.GDALError:
-        dsgdal = False #return False
+        pass
+
     try:
         dsogr = ogr.OpenShared(filepath)
     except ogr.OGRError:
-        dsogr = False #return False
+        pass
+
+    if dsogr and dsogr.GetDriver().GetName() in skip_drivers:
+        dsogr = False
+
     return dsgdal, dsogr
 
 def extentToLatLon(extent, proj):
@@ -234,7 +242,6 @@ def outputraster(resultsraster, counterraster, countervds, resultsFileStats, xml
 
 def processvds(vector, countervds,currentpath):
     vdsname = vector.GetName()
-    sys.stderr.write(vdsname + "\n")
     vdsformat = vector.GetDriver().GetName()
     vdslayercount = vector.GetLayerCount()
     resultslayers = {}
@@ -247,8 +254,11 @@ def processvds(vector, countervds,currentpath):
         else:
             layerproj = None
         layername = layer.GetName()
+        sys.stderr.write("Getting FeatureCount" +vdsname + "\n")
         layerfcount = str(layer.GetFeatureCount())
+        sys.stderr.write("Getting Extent" +vdsname + "\n")
         layerextentraw = strip(str(layer.GetExtent()),"()")
+        sys.stderr.write("Done" +vdsname + "\n")
         le = [float(x) for x in layerextentraw.split(',')]
         # reorder to llx, lly, urx, ury
         layerextent = (le[0], le[2], le[1], le[3])
