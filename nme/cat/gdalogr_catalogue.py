@@ -5,7 +5,6 @@
 # Usage: python gdalogr_catalogue.py <search path>
 # Sends hierarchical XML to stdout
 # Requires GDAL/OGR libraries: http://pypi.python.org/pypi/GDAL
-# Requires Python > 2.3 for itertools.tee function.
 
 # Author: Tyler Mitchell, Matthew Perry Jan-2008
 
@@ -27,10 +26,6 @@ TODO
 # DONE - decide on checksum process for determining changes
 - decide on process -> datasource linking (timestamp?) for top level relations
 '''
-from osgeo import gdal
-from osgeo import osr
-from osgeo import ogr
-
 import logging
 import os, sys
 import xml.etree.ElementTree as ET
@@ -38,6 +33,11 @@ from optparse import OptionParser, OptionGroup
 from string import strip
 from time import asctime
 from ElementTree_pretty import prettify
+from pyproj import Proj
+from osgeo import gdal
+from osgeo import osr
+from osgeo import ogr
+
 
 logging.basicConfig( stream=sys.stderr, level=logging.DEBUG )
 log = logging.getLogger("catalog")
@@ -50,6 +50,7 @@ def startup(startpath):
     countervds = 0
 
     dirlist, filelist = [], []
+    starttime = asctime()
     for eachpath in pathwalker:
         startdir = eachpath[0]
 
@@ -99,6 +100,7 @@ def startup(startpath):
                     except NotGeographic:
                         pass
 
+    
     xmlcatalog = appendXML(xmlroot, "CatalogueProcess")
     appendXML(xmlcatalog, "SearchPath", startpath)
     appendXML(xmlcatalog, "LaunchPath", os.getcwd())
@@ -106,11 +108,19 @@ def startup(startpath):
     appendXML(xmlcatalog, "IgnoredStrings", str(skiplist))
     appendXML(xmlcatalog, "DirCount", str(len(dirlist)))
     appendXML(xmlcatalog, "FileCount", str(len(filelist)))
-    appendXML(xmlcatalog, "Timestamp", asctime())
+    appendXML(xmlcatalog, "Timestamp", starttime)
     
     if options.printSql: 
-        processValues = {'SearchPath':startpath,'LaunchPath':os.getcwd(),'UserHome':os.getenv("HOME"),'IgnoredString':" ".join(map(str, skiplist)),'DirCount':int(len(dirlist)),'FileCount':int(len(filelist)),'Timestamp':asctime()}
-        print sqlOutput('process',processValues)
+        processValues = {
+                'SearchPath':startpath,
+                'LaunchPath':os.getcwd(),
+                'UserHome':os.getenv("HOME"),
+                'IgnoredString':" ".join(map(str, skiplist)),
+                'DirCount':int(len(dirlist)),
+                'FileCount':int(len(filelist)),
+                'Timestamp':asctime()
+        }
+        print sqlOutput('process', processValues)
 
 class NotGeographic(Exception):
     def __init__(self, message):
@@ -142,7 +152,8 @@ def skipfile(filepath, skiplist):
   
 def tryopends(filepath):
     dsogr, dsgdal = False, False
-    skip_drivers = ['AVCBin',] # GetFeatureCount and Extent are Way too slow and called many times TODO
+    # GetFeatureCount and Extent are Way too slow and called many times TODO
+    skip_drivers = ['AVCBin',] 
     try:
         dsgdal = gdal.OpenShared(filepath)
     except gdal.GDALError:
@@ -159,7 +170,6 @@ def tryopends(filepath):
     return dsgdal, dsogr
 
 def extentToLatLon(extent, proj):
-    from pyproj import Proj
     if proj == '' or proj is None:
         return None
     p1 = Proj(proj, preserve_units=True) 
@@ -199,7 +209,8 @@ def processraster(raster, counterraster, currentpath):
         resultseachbandShort = {'bandId': bandnum+1, 'min': min,'max': max, 'overviews': str(overviews)}
         resultsbands[str(bandnum+1)] = resultseachband
         if options.printSql: 
-            print sqlOutput('band',resultseachbandShort)
+            print sqlOutput('band', resultseachbandShort)
+
     resultsraster = { 
             'bands': resultsbands, 
             'rasterId': str(counterraster), 
@@ -289,22 +300,15 @@ def processvds(vector, countervds,currentpath):
             'latlonextent': strip(str(latlon_extent),"()"),
         }
         resultslayers[str(layernum+1)] = resultseachlayer
-        sqlstringvlay = "INSERT INTO layer %s VALUES %s;" % (
-                ('layerId','datasourceId','name','featurecount','extent'), 
-                (layernum+1,countervds,layername,int(layerfcount),layerextentraw))
         if options.printSql: 
             print sqlOutput('layer',resultseachlayer)
-        #if (layerftype <> 'UNKNOWN'):
-        #    Mapping(vector,layerextentraw,layername,layerftype) # mapping test
+
     resultsvds = { 
             'datasourceId': str(countervds), 
             'name': vdsname, 
             'format': vdsformat, 
             'layercount': str(vdslayercount) 
     }
-    sqlstringvds = "INSERT INTO datasource %s VALUES %s;" % (
-            ('datasourceId','name','format','layercount'), 
-            (countervds, vdsname, vdsformat, int(vdslayercount)))
     resultsvector = { 'resultsvds': resultsvds, 'resultslayers': resultslayers } 
     if options.printSql: 
         print sqlOutput('dataset',resultsvds)
@@ -361,22 +365,10 @@ def sqlCreateTables():
         sqlStatement = "CREATE TABLE %s (%s);" % (table, processColumns)
         print sqlStatement
 
-### TODO functions below...
-
-def xmlDtdOutput():
-    import zipfiles
-    # output dtd that corresponds to the xml, or is it schema?
-
-def checkZip(currentfile):
-    import zipfiles
-    # check if it can read zips
-
-def openZip(currentfile):
-    import zipfiles
-    # extract files and catalogue them
-
 def fileStats(filepath):
-    mode, ino, dev, nlink, user_id, group_id, file_size, time_accessed, time_modified, time_created = os.stat(filepath)
+    mode, ino, dev, nlink, user_id, group_id, file_size, \
+            time_accessed, time_modified, time_created = os.stat(filepath)
+
     if os.path.isfile(filepath):
         file_type = "File"
     else: 
@@ -393,7 +385,19 @@ def fileStats(filepath):
     full_path = os.path.abspath(filepath)
     md5_key = (full_path, user_name, file_size, time_modified, time_created)
     md5_digest = getMd5HexDigest(md5_key)
-    resultsFileStats = {'fullPath': str(full_path), 'userId': str(user_id), 'groupId': str(group_id), 'fileSize': str(file_size), 'timeAccessed': str(time_accessed), 'timeModified': str(time_modified), 'timeCreated': str(time_created), 'fileType': file_type, 'userName': user_name, 'userFullName': user_full_name, 'uniqueDigest': md5_digest}
+    resultsFileStats = {
+            'fullPath': str(full_path), 
+            'userId': str(user_id), 
+            'groupId': str(group_id), 
+            'fileSize': str(file_size), 
+            'timeAccessed': str(time_accessed), 
+            'timeModified': str(time_modified), 
+            'timeCreated': str(time_created), 
+            'fileType': file_type, 
+            'userName': user_name, 
+            'userFullName': user_full_name, 
+            'uniqueDigest': md5_digest
+    }
     return resultsFileStats
 
 def outputFileStats(resultsFileStats, xmlroot):
@@ -411,68 +415,6 @@ def getMd5HexDigest(encodeString):
     m = md5.new()
     m.update(str(encodeString))
     return m.hexdigest()
-
-class Mapping:
-    def __init__(self,datasource,extent,layername,layerftype):
-        import mapscript
-        from time import time
-        tmap = mapscript.mapObj()
-        print "checkpoint 1"
-        map.setSize(400,400)
-        #ext = rectObj(-180,-90,180,90)
-        ext = mapscript.rectObj(extent[0],extent[2],extent[1],extent[3]) # some trouble with some bad extents in my test data
-        map.extent = ext
-        map.units = mapscript.MS_DD # should be programmatically set
-        lay = mapscript.layerObj(map)
-        lay.name = "Autolayer"
-        lay.units = mapscript.MS_DD
-        if (layerftype == 'RASTER'):
-            lay.data = datasource.GetDescription()
-        else:
-            lay.data = datasource.GetName()
-        print lay.data
-        lay.status = mapscript.MS_DEFAULT
-        cls = mapscript.classObj(lay)
-        sty = mapscript.styleObj()
-        col = mapscript.colorObj(0,0,0)
-        #symPoint = mapscript.symbolObj
-        map.setSymbolSet("symbols/symbols_basic.sym")
-        if (layerftype == 'POINT'): 
-            lay.type = mapscript.MS_LAYER_POINT
-            sty.setSymbolByName = "achteck"
-            sty.width = 100
-            sty.color = col
-        elif (layerftype == 'LINE'): 
-            lay.type = mapscript.MS_LAYER_LINE
-            sty.setSymbolByName = "punkt"
-            sty.width = 5
-            sty.color = col
-        elif (layerftype == 'POLYGON'): 
-            lay.type = mapscript.MS_LAYER_POLYGON
-            sty.setSymbolByName = "circle"
-            sty.width = 10
-            sty.outlinecolor = col
-        elif (layerftype == 'RASTER'): 
-            lay.type = mapscript.MS_LAYER_RASTER
-            sty.setSymbolByName = "squares"
-            sty.size = 10
-            sty.color = col
-        #sty.setSymbolByName(map,symname)
-        #sty.size = symsize
-        cls.insertStyle(sty)
-        try:
-            img = map.draw()
-            img.save(str(time()) + "auto.gif")
-            map.save(str(time()) + "auto.map")
-        except MapServerError:
-            return None
-        # add layer
-        # assign datasource to layer
-        # add basic styling
-        # apply styling to layer
-        # open output image
-        # write, close, cleanup
-
 
 if __name__ == '__main__':
     parser = OptionParser(usage="gdalogr_catalog.py [options] -d /path/to/search")
@@ -498,7 +440,6 @@ if __name__ == '__main__':
     xmlroot = startXML()
     startup(startpath)
     if options.outfile:
-        #writeXML(xmlroot, options.outfile)
         with open(options.outfile,'w') as out:
             out.write(prettify(xmlroot))
             log.info("%s written" % options.outfile)
