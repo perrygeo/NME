@@ -475,11 +475,16 @@ class Mapping:
 if __name__ == '__main__':
     from optparse import OptionParser, OptionGroup
     parser = OptionParser(usage="gdalogr_catalog.py [options] -d /path/to/search")
-    parser.add_option("-d","--dir", action="store", type="string", dest="directory", help="Top level folder to start scanning from")
-    parser.add_option("-f","--file", action="store", type="string", dest="outfile", help="Output file (if specified, no stdout)" )
+    parser.add_option("-d","--dir", action="store", type="string", dest="directory", 
+            help="Top level folder to start scanning from")
+    parser.add_option("-f","--file", action="store", type="string", dest="outfile", 
+            help="Output file (if specified, no stdout)" )
+
     group = OptionGroup(parser, "Hack Options", "May not function without advanced knowledge")
-    group.add_option("-s","--sql", action="store_true", dest="printSql", help="Output results in SQL INSERT statements instead of XML")
+    group.add_option("-s","--sql", action="store_true", dest="printSql", 
+            help="Output results in SQL INSERT statements instead of XML")
     parser.add_option_group(group)
+
     (options, args) = parser.parse_args()
 
     startpath = options.directory
@@ -496,6 +501,8 @@ if __name__ == '__main__':
     xmlroot = startXML()
     startup(startpath)
     if options.outfile:
-        writeXML(xmlroot, options.outfile)
+        #writeXML(xmlroot, options.outfile)
+        with open(options.outfile,'w') as out:
+            out.write(prettify(xmlroot))
     else:
         print prettify(xmlroot)
