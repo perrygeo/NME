@@ -51,9 +51,10 @@ from xmlgen import XMLWriter
 #from mapscript import *
 #from time import time
 
+
 def startup(startpath):
-    gdal.PushErrorHandler()
     skiplist = ['.svn','.shx','.dbf', '.prj', '.aux.xml', '.e00', '.adf']
+    gdal.PushErrorHandler()
     pathwalker = os.walk(startpath)
     walkers = itertools.tee(pathwalker)
     counterraster = 0
@@ -63,36 +64,49 @@ def startup(startpath):
     for eachpath in walkers[0]:
         startdir = eachpath[0]
         alldirs = eachpath[1]
-        #alldirs = []  #TODO
         allfiles = eachpath[2]
-        #allfiles = []
         for eachdir in alldirs:
             currentdir = os.path.join(startdir,eachdir)
             raster,vector = None, None
             if (not skipfile(currentdir,skiplist)):
                 raster,vector = tryopends(currentdir)
             if raster:
-                counterraster += 1
-                resultsraster,resultsFileStats = processraster(raster,counterraster,currentdir)
-                xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
+                try:
+                    resultsraster,resultsFileStats = processraster(raster,counterraster,currentdir)
+                    xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
+                    counterraster += 1
+                except NotGeographic:
+                    pass
             if vector:
-                countervds += 1
-                resultsvds,resultsFileStats = processvds(vector,countervds,currentdir)
-                xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats, xmlroot)
+                try:
+                    resultsvds,resultsFileStats = processvds(vector,countervds,currentdir)
+                    xmlvector = outputvector(resultsvds, counterraster, countervds, resultsFileStats, xmlroot)
+                    countervds += 1
+                except NotGeographic:
+                    pass
         for eachfile in allfiles:
             currentfile = "/".join([startdir, eachfile])
             raster, vector = None, None
             if (not skipfile(currentfile,skiplist)):
                 raster, vector = tryopends(currentfile)
             if raster:
-                counterraster += 1
-                resultsraster,resultsFileStats = processraster(raster, counterraster, currentfile)
-                xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats,xmlroot)
+                try:
+                    resultsraster,resultsFileStats = processraster(raster, counterraster, currentfile)
+                    xmlraster = outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot)
+                    counterraster += 1
+                except NotGeographic:
+                    pass
             if vector:
-                if (not skipfile(vector.GetName(),skiplist)):
-                    countervds += 1
-                    resultsvds,resultsFileStats = processvds(vector, countervds, currentfile)
-                    xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats,xmlroot)
+                if not skipfile(vector.GetName(), skiplist):
+                    try:
+                        resultsvds,resultsFileStats = processvds(vector, countervds, currentfile)
+                        xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats,xmlroot)
+                        countervds += 1
+                    except NotGeographic:
+                        pass
+
+class NotGeographic(Exception):
+    pass
 
 def processStats(walkerlist, skiplist, startpath, xmlroot):
     from time import asctime
@@ -140,7 +154,6 @@ def skipfile(filepath, skiplist):
 def tryopends(filepath):
     dsogr, dsgdal = False, False
     skip_drivers = ['AVCBin',] # GetFeatureCount and Extent are Way too slow and called many times TODO
-
     try:
         dsgdal = gdal.OpenShared(filepath)
     except gdal.GDALError:
@@ -173,6 +186,8 @@ def processraster(raster, counterraster, currentpath):
     bandcount = raster.RasterCount
     geotrans = strip(str(raster.GetGeoTransform()),"()")
     geotrans = [float(strip(x)) for x in geotrans.split(",")]
+    if geotrans == [0.0, 1.0, 0.0, 0.0, 0.0, 1.0]:
+        raise NotGeographic("No geotrans found; not a geographic dataset")
     driver = raster.GetDriver().LongName
     rasterx = raster.RasterXSize
     rastery = raster.RasterYSize
@@ -241,11 +256,15 @@ def outputraster(resultsraster, counterraster, countervds, resultsFileStats, xml
     return True
 
 def processvds(vector, countervds,currentpath):
+    sys.stderr.write("\n")
     vdsname = vector.GetName()
     vdsformat = vector.GetDriver().GetName()
     vdslayercount = vector.GetLayerCount()
     resultslayers = {}
     resultsFileStats = fileStats(currentpath)
+    if resultsFileStats['fileType'] == 'Directory' and vdsformat == 'ESRI Shapefile':
+        raise NotGeographic("Just a directory of shapefiles; nothing to see here")
+
     for layernum in range(vdslayercount): #process all layers
         layer = vector.GetLayer(layernum)
         spatialref = layer.GetSpatialRef()
@@ -336,15 +355,14 @@ def outputvector(resultsvector, counterraster, countervds, resultsFileStats,xmlr
     xmlvector = appendXML(xmlroot, "VectorData")
     statfileStats = outputFileStats(resultsFileStats, xmlvector)
     for vectoritem, vectorvalue in resultsvector.iteritems(): # resultsvector includes two dictionaries
-        if vectoritem <> 'resultslayers':
-            for vectordsitem, vectordsvalue in vectorvalue.iteritems(): # vectorvalue contains datasource attributes
-                appendXML(xmlvector, vectordsitem, vectordsvalue)
-
         if vectoritem == 'resultslayers':
             for layeritem, layervalue in vectorvalue.iteritems(): # vectorvalue contains a dictionary of the layers
                 xmlvectorlayer = appendXML(xmlvector, "VectorLayer")
                 for layeritemdetails, layervaluedetails in layervalue.iteritems(): # layervalue contains layer attributes
                     appendXML(xmlvectorlayer, layeritemdetails, layervaluedetails)
+        else:
+            for vectordsitem, vectordsvalue in vectorvalue.iteritems(): # vectorvalue contains datasource attributes
+                appendXML(xmlvector, vectordsitem, vectordsvalue)
     return True
 
 def sqlOutput(tableName, valueDict):
