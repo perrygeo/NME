@@ -29,6 +29,7 @@ TODO
 import logging
 import os, sys
 import xml.etree.ElementTree as ET
+import hashlib
 from optparse import OptionParser, OptionGroup
 from string import strip
 from time import asctime
@@ -37,7 +38,6 @@ from pyproj import Proj
 from osgeo import gdal
 from osgeo import osr
 from osgeo import ogr
-
 
 logging.basicConfig( stream=sys.stderr, level=logging.WARNING )
 log = logging.getLogger("catalog")
@@ -62,11 +62,11 @@ def startup(startpath):
     for eachpath in pathwalker:
         startdir = eachpath[0]
 
-        dirlist += eachpath[1]
-        filelist += eachpath[2]
-
         alldirs = eachpath[1]
+        dirlist += alldirs
+
         allfiles = eachpath[2]
+        filelist += allfiles
 
         for eachdir in alldirs:
             currentdir = os.path.join(startdir,eachdir)
@@ -104,15 +104,17 @@ def startup(startpath):
                 if not skipfile(vector.GetName(), skiplist):
                     try:
                         resultsvds,resultsFileStats = processvds(vector, countervds, currentfile)
-                        xmlvector = outputvector(resultsvds,counterraster,countervds,resultsFileStats,xmlroot)
+                        xmlvector = outputvector(resultsvds, counterraster, countervds, resultsFileStats, xmlroot)
                         countervds += 1
                     except NotGeographic:
                         pass
 
         sys.stderr.write("\rFound %d vector and %d rasters datasets.   %s" % (countervds, counterraster, cursor.next()) )
         sys.stderr.flush()
-
     
+    outputprocess(startpath, skiplist, dirlist, filelist, starttime)
+
+def outputprocess(startpath, skiplist, dirlist, filelist, starttime):
     xmlcatalog = appendXML(xmlroot, "CatalogueProcess")
     appendXML(xmlcatalog, "SearchPath", startpath)
     appendXML(xmlcatalog, "LaunchPath", os.getcwd())
@@ -423,8 +425,7 @@ def outputXml(root,newelement):
     return 
   
 def getMd5HexDigest(encodeString):
-    import md5
-    m = md5.new()
+    m = hashlib.md5()
     m.update(str(encodeString))
     return m.hexdigest()
 
