@@ -39,8 +39,15 @@ from osgeo import osr
 from osgeo import ogr
 
 
-logging.basicConfig( stream=sys.stderr, level=logging.DEBUG )
+logging.basicConfig( stream=sys.stderr, level=logging.WARNING )
 log = logging.getLogger("catalog")
+
+def spinning_cursor():
+    cursor='/-\|'
+    i = 0
+    while 1:
+        yield cursor[i]
+        i = (i + 1) % len(cursor)
 
 def startup(startpath):
     skiplist = ['.svn','.shx','.dbf', '.prj', '.aux.xml', '.e00', '.adf']
@@ -48,6 +55,7 @@ def startup(startpath):
     pathwalker = os.walk(startpath)
     counterraster = 0
     countervds = 0
+    cursor = spinning_cursor()
 
     dirlist, filelist = [], []
     starttime = asctime()
@@ -79,6 +87,7 @@ def startup(startpath):
                     countervds += 1
                 except NotGeographic:
                     pass
+
         for eachfile in allfiles:
             currentfile = "/".join([startdir, eachfile])
             raster, vector = None, None
@@ -99,6 +108,9 @@ def startup(startpath):
                         countervds += 1
                     except NotGeographic:
                         pass
+
+        sys.stderr.write("\rFound %d vector and %d rasters datasets.   %s" % (countervds, counterraster, cursor.next()) )
+        sys.stderr.flush()
 
     
     xmlcatalog = appendXML(xmlroot, "CatalogueProcess")
@@ -125,7 +137,7 @@ def startup(startpath):
 class NotGeographic(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
-        log.warn(message)
+        log.info(message)
 
 def startXML():
     xmlroot = ET.Element("DataCatalogue")
