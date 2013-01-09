@@ -27,28 +27,17 @@ TODO
 # DONE - decide on checksum process for determining changes
 - decide on process -> datasource linking (timestamp?) for top level relations
 '''
-try:
-    from osgeo import gdal
-    from osgeo import osr
-    from osgeo import ogr
-except ImportError:
-    import gdal
-    import osr
-    import ogr
+from osgeo import gdal
+from osgeo import osr
+from osgeo import ogr
 
 import logging
 import os, sys
-import itertools
-import getopt
+import xml.etree.ElementTree as ET
+from optparse import OptionParser, OptionGroup
 from string import strip
-
-# Following for xml output
-# xmlgen.py script required in same folder
-from xmlgen import XMLWriter
-
-# Following for class Mapping()
-#from mapscript import *
-#from time import time
+from time import asctime
+from ElementTree_pretty import prettify
 
 logging.basicConfig( stream=sys.stderr, level=logging.DEBUG )
 log = logging.getLogger("catalog")
@@ -57,15 +46,19 @@ def startup(startpath):
     skiplist = ['.svn','.shx','.dbf', '.prj', '.aux.xml', '.e00', '.adf']
     gdal.PushErrorHandler()
     pathwalker = os.walk(startpath)
-    walkers = itertools.tee(pathwalker)
     counterraster = 0
     countervds = 0
 
-    processStats(walkers[1], skiplist, startpath, xmlroot)
-    for eachpath in walkers[0]:
+    dirlist, filelist = [], []
+    for eachpath in pathwalker:
         startdir = eachpath[0]
+
+        dirlist += eachpath[1]
+        filelist += eachpath[2]
+
         alldirs = eachpath[1]
         allfiles = eachpath[2]
+
         for eachdir in alldirs:
             currentdir = os.path.join(startdir,eachdir)
             raster,vector = None, None
@@ -106,18 +99,6 @@ def startup(startpath):
                     except NotGeographic:
                         pass
 
-class NotGeographic(Exception):
-    def __init__(self, message):
-        Exception.__init__(self, message)
-        log.warn(message)
-
-def processStats(walkerlist, skiplist, startpath, xmlroot):
-    from time import asctime
-    dirlist, filelist = [], []
-    for entry in walkerlist:
-        dirlist += entry[1]
-        filelist += entry[2]
-    
     xmlcatalog = appendXML(xmlroot, "CatalogueProcess")
     appendXML(xmlcatalog, "SearchPath", startpath)
     appendXML(xmlcatalog, "LaunchPath", os.getcwd())
@@ -130,6 +111,11 @@ def processStats(walkerlist, skiplist, startpath, xmlroot):
     if options.printSql: 
         processValues = {'SearchPath':startpath,'LaunchPath':os.getcwd(),'UserHome':os.getenv("HOME"),'IgnoredString':" ".join(map(str, skiplist)),'DirCount':int(len(dirlist)),'FileCount':int(len(filelist)),'Timestamp':asctime()}
         print sqlOutput('process',processValues)
+
+class NotGeographic(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+        log.warn(message)
 
 def startXML():
     xmlroot = ET.Element("DataCatalogue")
@@ -240,7 +226,7 @@ def processraster(raster, counterraster, currentpath):
     }
     if options.printSql: 
         print sqlOutput('raster',resultsrasterShort)
-    #Mapping(raster,extent,rastername,'RASTER') # mapping test
+
     return resultsraster, resultsFileStats
   
 def outputraster(resultsraster, counterraster, countervds, resultsFileStats, xmlroot):
@@ -489,7 +475,6 @@ class Mapping:
 
 
 if __name__ == '__main__':
-    from optparse import OptionParser, OptionGroup
     parser = OptionParser(usage="gdalogr_catalog.py [options] -d /path/to/search")
     parser.add_option("-d","--dir", action="store", type="string", dest="directory", 
             help="Top level folder to start scanning from")
@@ -510,10 +495,6 @@ if __name__ == '__main__':
     if not startpath or not os.path.exists(startpath):
         parser.error("Please supply an valid search directory")
 
-    from xml.etree.ElementTree import Element, SubElement
-    import xml.etree.ElementTree as ET
-
-    from ElementTree_pretty import prettify
     xmlroot = startXML()
     startup(startpath)
     if options.outfile:
