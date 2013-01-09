@@ -523,6 +523,6 @@ if __name__ == '__main__':
         #writeXML(xmlroot, options.outfile)
         with open(options.outfile,'w') as out:
             out.write(prettify(xmlroot))
-            log.info("% written" % options.outfile)
+            log.info("%s written" % options.outfile)
     else:
         print prettify(xmlroot)
