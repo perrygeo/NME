@@ -53,7 +53,6 @@ from xmlgen import XMLWriter
 logging.basicConfig( stream=sys.stderr, level=logging.DEBUG )
 log = logging.getLogger("catalog")
 
-
 def startup(startpath):
     skiplist = ['.svn','.shx','.dbf', '.prj', '.aux.xml', '.e00', '.adf']
     gdal.PushErrorHandler()
@@ -208,9 +207,7 @@ def processraster(raster, counterraster, currentpath):
     resultsFileStats = fileStats(currentpath)
     for bandnum in range(bandcount):
         band = raster.GetRasterBand(bandnum+1)
-        #TODO this is really expensive! 
-        #min, max = band.ComputeRasterMinMax()
-        min, max = 0, 1
+        min, max = band.ComputeRasterMinMax(1) #approx_ok=1
         overviews = band.GetOverviewCount()
         resultseachband = {'bandId': str(bandnum+1), 'min': str(min),'max': str(max), 'overviews': str(overviews)}
         resultseachbandShort = {'bandId': bandnum+1, 'min': min,'max': max, 'overviews': str(overviews)}
