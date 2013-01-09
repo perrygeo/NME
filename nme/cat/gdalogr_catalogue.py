@@ -38,6 +38,7 @@ except ImportError:
     import osr
     import ogr
 
+import logging
 import os, sys
 import itertools
 import getopt
@@ -50,6 +51,9 @@ from xmlgen import XMLWriter
 # Following for class Mapping()
 #from mapscript import *
 #from time import time
+
+logging.basicConfig( stream=sys.stderr, level=logging.DEBUG )
+log = logging.getLogger("catalog")
 
 
 def startup(startpath):
@@ -106,7 +110,9 @@ def startup(startpath):
                         pass
 
 class NotGeographic(Exception):
-    pass
+    def __init__(self, message):
+        Exception.__init__(self, message)
+        log.warn(message)
 
 def processStats(walkerlist, skiplist, startpath, xmlroot):
     from time import asctime
@@ -182,7 +188,7 @@ def extentToLatLon(extent, proj):
 
 def processraster(raster, counterraster, currentpath):
     rastername = raster.GetDescription()
-    sys.stderr.write(rastername + "\n")
+    log.debug(rastername)
     bandcount = raster.RasterCount
     geotrans = strip(str(raster.GetGeoTransform()),"()")
     geotrans = [float(strip(x)) for x in geotrans.split(",")]
@@ -256,8 +262,8 @@ def outputraster(resultsraster, counterraster, countervds, resultsFileStats, xml
     return True
 
 def processvds(vector, countervds,currentpath):
-    sys.stderr.write("\n")
     vdsname = vector.GetName()
+    log.debug(vdsname)
     vdsformat = vector.GetDriver().GetName()
     vdslayercount = vector.GetLayerCount()
     resultslayers = {}
@@ -273,11 +279,8 @@ def processvds(vector, countervds,currentpath):
         else:
             layerproj = None
         layername = layer.GetName()
-        sys.stderr.write("Getting FeatureCount" +vdsname + "\n")
         layerfcount = str(layer.GetFeatureCount())
-        sys.stderr.write("Getting Extent" +vdsname + "\n")
         layerextentraw = strip(str(layer.GetExtent()),"()")
-        sys.stderr.write("Done" +vdsname + "\n")
         le = [float(x) for x in layerextentraw.split(',')]
         # reorder to llx, lly, urx, ury
         layerextent = (le[0], le[2], le[1], le[3])
