@@ -26,8 +26,6 @@ TODO
 - extent values to GML or basic WKT bbox
 # DONE - decide on checksum process for determining changes
 - decide on process -> datasource linking (timestamp?) for top level relations
-
-
 '''
 try:
     from osgeo import gdal
@@ -525,5 +523,6 @@ if __name__ == '__main__':
         #writeXML(xmlroot, options.outfile)
         with open(options.outfile,'w') as out:
             out.write(prettify(xmlroot))
+            log.info("% written" % options.outfile)
     else:
         print prettify(xmlroot)
