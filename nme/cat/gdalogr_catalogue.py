@@ -70,9 +70,9 @@ def startup(startpath):
 
         for eachdir in alldirs:
             currentdir = os.path.join(startdir,eachdir)
-            raster,vector = None, None
+            raster, vector = None, None
             if (not skipfile(currentdir,skiplist)):
-                raster,vector = tryopends(currentdir)
+                raster, vector = tryopends(currentdir)
             if raster:
                 try:
                     resultsraster,resultsFileStats = processraster(raster, counterraster, currentdir)
@@ -90,6 +90,7 @@ def startup(startpath):
 
         for eachfile in allfiles:
             currentfile = "/".join([startdir, eachfile])
+            print currentfile == os.path.join(startdir, eachfile)
             raster, vector = None, None
             if (not skipfile(currentfile,skiplist)):
                 raster, vector = tryopends(currentfile)
