@@ -96,9 +96,11 @@ def getCatalog(startpath):
                 except NotGeographic:
                     pass
 
-        sys.stderr.write("\rFound %d vector and %d rasters datasets.   %s" % (countervds, counterraster, cursor.next()) )
+        sys.stderr.write("\rFound %d vector and %d rasters datasets.   %s" % (countervds, 
+            counterraster, cursor.next()) )
         sys.stderr.flush()
     
+    sys.stderr.write("\n")
     catalog['meta'] = processmeta(startpath, skiplist, dirlist, filelist, starttime)
     return catalog
 
