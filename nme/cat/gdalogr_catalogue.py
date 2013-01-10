@@ -324,10 +324,10 @@ def getFileStats(filepath):
     md5_key = (full_path, user_name, file_size, time_modified, time_created)
     md5_digest = getMd5HexDigest(md5_key)
     resultsFileStats = {
-            'fullPath': str(full_path), 
-            'userId': str(user_id), 
-            'groupId': str(group_id), 
-            'fileSize': str(file_size), 
+            'fullPath': full_path, 
+            'userId': user_id, 
+            'groupId': group_id, 
+            'fileSize': file_size, 
             'timeAccessed': str(time_accessed), 
             'timeModified': str(time_modified), 
             'timeCreated': str(time_created), 
