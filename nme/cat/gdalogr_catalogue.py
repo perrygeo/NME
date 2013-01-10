@@ -39,6 +39,9 @@ from osgeo import gdal
 from osgeo import osr
 from osgeo import ogr
 
+gdal.UseExceptions()
+ogr.UseExceptions()
+
 logging.basicConfig( stream=sys.stderr, level=logging.WARNING )
 log = logging.getLogger("catalog")
 
@@ -123,13 +126,18 @@ def tryopends(filepath):
     dsogr, dsgdal = False, False
     # GetFeatureCount and Extent are Way too slow and called many times TODO
     skip_drivers = ['AVCBin',] 
+
     try:
         dsgdal = gdal.OpenShared(filepath)
+    except RuntimeError:
+        pass
     except gdal.GDALError:
         pass
 
     try:
         dsogr = ogr.OpenShared(filepath)
+    except RuntimeError:
+        pass
     except ogr.OGRError:
         pass
 
@@ -344,21 +352,14 @@ def getMd5HexDigest(encodeString):
     return m.hexdigest()
 
 if __name__ == '__main__':
-    parser = OptionParser(usage="gdalogr_catalog.py [options] -d /path/to/search")
-    parser.add_option("-d","--dir", action="store", type="string", dest="directory", 
-            help="Top level folder to start scanning from")
+    parser = OptionParser(usage="gdalogr_catalog.py /path/to/search -f output.json")
     parser.add_option("-f","--file", action="store", type="string", dest="outfile", 
             help="Output file (if specified, no stdout)" )
 
-    group = OptionGroup(parser, "Hack Options", "May not function without advanced knowledge")
-    group.add_option("-s","--sql", action="store_true", dest="printSql", 
-            help="Output results in SQL INSERT statements instead of XML")
-    parser.add_option_group(group)
-
     (options, args) = parser.parse_args()
 
-    startpath = options.directory
-    if not startpath and len(args) >= 1:
+    startpath = None
+    if len(args) == 1:
         startpath = args[0]
 
     if not startpath or not os.path.exists(startpath):
