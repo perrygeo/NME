@@ -3,7 +3,7 @@
 # gdalogr_catalogue.py
 # Purpose: Catalog all raster & vector datasources/layers found in a directory tree
 # Usage: python gdalogr_catalogue.py <search path>
-# Sends hierarchical XML to stdout
+# Sends hierarchical JSON to stdout
 # Requires GDAL/OGR libraries: http://pypi.python.org/pypi/GDAL
 
 # Author: Tyler Mitchell, Matthew Perry Jan-2008
@@ -17,6 +17,7 @@
 # 16-JAN-08 - renamed outputs entities, added higher level elements/summary stats
 # 12-FEB-08 - Added bad hack to output INSERT statements if you add 2nd argument in command "SQL".  e.g. python gdalogr_catalogue.py ../ SQL | grep INSERT - hacked for Markus :)
 # 25-MAR-12 - Rework arg handling a bit, made indentation consistent, 
+# 09-JAN-13 - use a pure-python data structure and convert directly to json 
 
 '''
 TODO
@@ -28,12 +29,11 @@ TODO
 '''
 import logging
 import os, sys
-import xml.etree.ElementTree as ET
 import hashlib
+import json
 from optparse import OptionParser, OptionGroup
 from string import strip
 from time import asctime
-from ElementTree_pretty import prettify
 from pyproj import Proj
 from osgeo import gdal
 from osgeo import osr
@@ -49,7 +49,7 @@ def spinning_cursor():
         yield cursor[i]
         i = (i + 1) % len(cursor)
 
-def startup(startpath):
+def getCatalog(startpath):
     skiplist = ['.svn','.shx','.dbf', '.prj', '.aux.xml', '.e00', '.adf']
     gdal.PushErrorHandler()
     pathwalker = os.walk(startpath)
@@ -59,6 +59,12 @@ def startup(startpath):
 
     dirlist, filelist = [], []
     starttime = asctime()
+
+    catalog = { 
+        'raster_data': [],
+        'vector_data': [],
+    }
+
     for eachpath in pathwalker:
         startdir = eachpath[0]
 
@@ -75,8 +81,8 @@ def startup(startpath):
                 raster, vector = tryopends(currentfile)
             if raster:
                 try:
-                    resultsraster, resultsFileStats = processraster(raster, counterraster, currentfile)
-                    outputraster(resultsraster, resultsFileStats, xmlroot)
+                    raster = processraster(raster, counterraster, currentfile)
+                    catalog['raster_data'].append(raster)
                     counterraster += 1
                 except NotGeographic:
                     pass
@@ -84,8 +90,8 @@ def startup(startpath):
                 if skipfile(vector.GetName(), skiplist):
                     raise Exception("This should not happen")
                 try:
-                    resultsvds, resultsFileStats = processvds(vector, countervds, currentfile)
-                    outputvector(resultsvds, resultsFileStats, xmlroot)
+                    vector = processvds(vector, countervds, currentfile)
+                    catalog['vector_data'].append(vector)
                     countervds += 1
                 except NotGeographic:
                     pass
@@ -93,25 +99,13 @@ def startup(startpath):
         sys.stderr.write("\rFound %d vector and %d rasters datasets.   %s" % (countervds, counterraster, cursor.next()) )
         sys.stderr.flush()
     
-    outputprocess(startpath, skiplist, dirlist, filelist, starttime)
+    catalog['meta'] = processmeta(startpath, skiplist, dirlist, filelist, starttime)
+    return catalog
 
 class NotGeographic(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
         log.info(message)
-
-def startXML():
-    xmlroot = ET.Element("DataCatalogue")
-    return xmlroot
-
-def appendXML(elementroot, subelement, subelstring=None):
-    newelement = ET.SubElement(elementroot, subelement)
-    newelement.text = subelstring
-    return newelement
-
-def writeXML(xmlroot, outfile):
-    xmltree = ET.ElementTree(xmlroot)
-    xmltree.write(outfile)
 
 def skipfile(filepath, skiplist):
     skipstatus = None
@@ -169,121 +163,65 @@ def processraster(raster, counterraster, currentpath):
     proj = srs.ExportToProj4()
 
     # llx, lly, urx, ury
-    extent = (geotrans[0], geotrans[3] + (geotrans[5] * rastery), geotrans[0] + ( geotrans[1] * rasterx ), geotrans[3], )
+    extent = (geotrans[0], 
+              geotrans[3] + (geotrans[5] * rastery), 
+              geotrans[0] + (geotrans[1] * rasterx), 
+              geotrans[3])
     latlon_extent = extentToLatLon(extent, proj)
 
-    resultsbands = {}
-    resultsFileStats = fileStats(currentpath)
-    for bandnum in range(bandcount):
-        band = raster.GetRasterBand(bandnum+1)
-        min, max = band.ComputeRasterMinMax(1) #approx_ok=1
+    resultsbands = []
+    for bandnum in range(1, bandcount + 1): # 1-indexed
+        band = raster.GetRasterBand(bandnum)
+        minval, maxval = band.ComputeRasterMinMax(1) # approx_ok=1
         overviews = band.GetOverviewCount()
-        resultseachband = {'bandId': str(bandnum+1), 'min': str(min),'max': str(max), 'overviews': str(overviews)}
-        resultseachbandShort = {'bandId': bandnum+1, 'min': min,'max': max, 'overviews': str(overviews)}
-        resultsbands[str(bandnum+1)] = resultseachband
-        if options.printSql: 
-            print sqlOutput('band', resultseachbandShort)
+        resultseachband = {
+                'bandId': bandnum, 
+                'min': minval,
+                'max': maxval, 
+                'overviews': overviews
+        }
+        resultsbands.append(resultseachband)
 
     resultsraster = { 
             'bands': resultsbands, 
-            'rasterId': str(counterraster), 
-            'name': rastername, 
-            'bandcount': str(bandcount), 
-            'geotrans': str(geotrans), 
-            'driver': str(driver), 
-            'rasterX': str(rasterx), 
-            'rasterY': str(rastery), 
-            'projection': wkt,
-            'proj': proj,
-            'latlonextent': strip(str(latlon_extent),"()"),
-            'extent': strip(str(extent), "()")
-    }
-    resultsrasterShort =  {
-            'rasterId':counterraster, 
+            'rasterId': counterraster, 
             'name': rastername, 
             'bandcount': bandcount, 
-            'geotrans': str(geotrans), 
+            'geotrans': geotrans, 
             'driver': driver, 
             'rasterX': rasterx, 
             'rasterY': rastery, 
-            'projection': wkt
+            'projection': wkt,
+            'proj': proj,
+            'latlonextent': latlon_extent,
+            'extent': extent,
+            'filestats': getFileStats(currentpath)
     }
-    if options.printSql: 
-        print sqlOutput('raster',resultsrasterShort)
 
-    return resultsraster, resultsFileStats
+    return resultsraster
   
-def outputprocess(startpath, skiplist, dirlist, filelist, starttime):
-    xmlcatalog = appendXML(xmlroot, "CatalogueProcess")
-    appendXML(xmlcatalog, "SearchPath", startpath)
-    appendXML(xmlcatalog, "LaunchPath", os.getcwd())
-    appendXML(xmlcatalog, "UserHome", os.getenv("HOME"))
-    appendXML(xmlcatalog, "IgnoredStrings", str(skiplist))
-    appendXML(xmlcatalog, "DirCount", str(len(dirlist)))
-    appendXML(xmlcatalog, "FileCount", str(len(filelist)))
-    appendXML(xmlcatalog, "Timestamp", starttime)
-    
-    if options.printSql: 
-        processValues = {
-                'SearchPath':startpath,
-                'LaunchPath':os.getcwd(),
-                'UserHome':os.getenv("HOME"),
-                'IgnoredString':" ".join(map(str, skiplist)),
-                'DirCount':int(len(dirlist)),
-                'FileCount':int(len(filelist)),
-                'Timestamp':asctime()
-        }
-        print sqlOutput('process', processValues)
+def processmeta(startpath, skiplist, dirlist, filelist, starttime):
+    processValues = {
+            'SearchPath':startpath,
+            'LaunchPath':os.getcwd(),
+            'UserHome':os.getenv("HOME"),
+            'IgnoredString':" ".join(map(str, skiplist)),
+            'DirCount':int(len(dirlist)),
+            'FileCount':int(len(filelist)),
+            'Timestamp':asctime()
+    }
+    return processValues
 
-def outputraster(resultsraster, resultsFileStats, xmlroot):
-    xmlraster = appendXML(xmlroot, "RasterData")
-    outputFileStats(resultsFileStats, xmlraster)
-
-    # Bands
-    rastervalue = resultsraster['bands']
-    for banditem, bandvalue in rastervalue.iteritems(): 
-        # for each band
-        xmlband = appendXML(xmlraster, "RasterBand")
-        for banditemdetails, bandvaluedetails in bandvalue.iteritems():
-            appendXML(xmlband, banditemdetails, bandvaluedetails)
-
-    # Datasource
-    for rasteritem, rastervalue in resultsraster.iteritems(): 
-        if rasteritem != 'bands':
-            appendXML(xmlraster, rasteritem, rastervalue)
-
-    return True
-
-def outputvector(resultsvector, resultsFileStats, xmlroot):
-    xmlvector = appendXML(xmlroot, "VectorData")
-    outputFileStats(resultsFileStats, xmlvector)
-
-    # Layers 
-    vectorvalue = resultsvector['resultslayers']
-    for layeritem, layervalue in vectorvalue.iteritems(): # vectorvalue contains a dictionary of the layers
-        xmlvectorlayer = appendXML(xmlvector, "VectorLayer")
-        for layeritemdetails, layervaluedetails in layervalue.iteritems(): 
-            # layervalue contains layer attributes
-            appendXML(xmlvectorlayer, layeritemdetails, layervaluedetails)
-
-    # Datasource
-    vectordsvalue = resultsvector['resultsvds']
-    for vectordsitem, vectordsvalue in vectordsvalue.iteritems(): 
-        # vectorvalue contains datasource attributes
-        appendXML(xmlvector, vectordsitem, vectordsvalue)
-
-    return True
-
-def processvds(vector, countervds,currentpath):
+def processvds(vector, countervds, currentpath):
     vdsname = vector.GetName()
     log.debug(vdsname)
     vdsformat = vector.GetDriver().GetName()
     vdslayercount = vector.GetLayerCount()
-    resultslayers = {}
-    resultsFileStats = fileStats(currentpath)
-    if resultsFileStats['fileType'] == 'Directory' and vdsformat == 'ESRI Shapefile':
+    filestats = getFileStats(currentpath)
+    if filestats['fileType'] == 'Directory' and vdsformat == 'ESRI Shapefile':
         raise NotGeographic("Just a directory of shapefiles; nothing to see here")
 
+    resultslayers = []
     for layernum in range(vdslayercount): #process all layers
         layer = vector.GetLayer(layernum)
         spatialref = layer.GetSpatialRef()
@@ -304,37 +242,27 @@ def processvds(vector, countervds,currentpath):
         else:
             latlon_extent = None
 
-        # the following throws all the attributes into dictionaries of attributes, 
-        # some of which are other dictionaries
-        # resultseachlayer = 1 layer attributes
-        # resultslayers = dict. of all layers and their attributes
-        # resultsvds = datasource attributes
-        # resultsvector = dict of datasource attributes, plus a dict of all layers
-        # Note all get saved as strings, which isn't what you'd want for SQL output
         resultseachlayer = {
-            'layerId': str(layernum+1), 
+            'layerId': layernum, 
             'name': layername, 
             'proj': layerproj, 
-            'featuretype': str(layerftype), 
-            'featurecount': str(layerfcount), 
-            'extent': strip(str(layerextent),"()"),
-            'latlonextent': strip(str(latlon_extent),"()"),
+            'featuretype': layerftype, 
+            'featurecount': layerfcount, 
+            'extent': layerextent,
+            'latlonextent': latlon_extent
         }
-        resultslayers[str(layernum+1)] = resultseachlayer
-        if options.printSql: 
-            print sqlOutput('layer',resultseachlayer)
+        resultslayers.append(resultseachlayer)
 
-    resultsvds = { 
+    resultsvector = { 
             'datasourceId': str(countervds), 
             'name': vdsname, 
             'format': vdsformat, 
-            'layercount': str(vdslayercount) 
+            'layercount': str(vdslayercount), 
+            'filestats': filestats,
+            'layers': resultslayers
     }
-    resultsvector = { 'resultsvds': resultsvds, 'resultslayers': resultslayers } 
-    if options.printSql: 
-        print sqlOutput('dataset',resultsvds)
 
-    return resultsvector,resultsFileStats
+    return resultsvector
 
 def featureTypeName( type ):
     if type == ogr.wkbUnknown:
@@ -373,7 +301,7 @@ def sqlCreateTables():
         sqlStatement = "CREATE TABLE %s (%s);" % (table, processColumns)
         print sqlStatement
 
-def fileStats(filepath):
+def getFileStats(filepath):
     mode, ino, dev, nlink, user_id, group_id, file_size, \
             time_accessed, time_modified, time_created = os.stat(filepath)
 
@@ -408,16 +336,6 @@ def fileStats(filepath):
     }
     return resultsFileStats
 
-def outputFileStats(resultsFileStats, xmlroot):
-    xmlfilestats = appendXML(xmlroot, "FileStats")
-    for statitem, statvalue in resultsFileStats.iteritems():
-        appendXML(xmlfilestats, statitem, statvalue)
-    return True
-
-def outputXml(root,newelement):
-    SubElement(root,newelement)
-    return 
-  
 def getMd5HexDigest(encodeString):
     m = hashlib.md5()
     m.update(str(encodeString))
@@ -444,11 +362,10 @@ if __name__ == '__main__':
     if not startpath or not os.path.exists(startpath):
         parser.error("Please supply an valid search directory")
 
-    xmlroot = startXML()
-    startup(startpath)
+    catalog = getCatalog(startpath)
     if options.outfile:
         with open(options.outfile,'w') as out:
-            out.write(prettify(xmlroot))
+            out.write(json.dumps(catalog))
             log.info("%s written" % options.outfile)
     else:
-        print prettify(xmlroot)
+        print json.dumps(catalog, indent=2)
