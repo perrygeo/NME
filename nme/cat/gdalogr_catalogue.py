@@ -68,47 +68,27 @@ def startup(startpath):
         allfiles = eachpath[2]
         filelist += allfiles
 
-        for eachdir in alldirs:
-            currentdir = os.path.join(startdir,eachdir)
-            raster, vector = None, None
-            if (not skipfile(currentdir,skiplist)):
-                raster, vector = tryopends(currentdir)
-            if raster:
-                try:
-                    resultsraster,resultsFileStats = processraster(raster, counterraster, currentdir)
-                    xmlraster = outputraster(resultsraster, resultsFileStats, xmlroot)
-                    counterraster += 1
-                except NotGeographic:
-                    pass
-            if vector:
-                try:
-                    resultsvds,resultsFileStats = processvds(vector,countervds,currentdir)
-                    xmlvector = outputvector(resultsvds, resultsFileStats, xmlroot)
-                    countervds += 1
-                except NotGeographic:
-                    pass
-
-        for eachfile in allfiles:
-            currentfile = "/".join([startdir, eachfile])
-            print currentfile == os.path.join(startdir, eachfile)
+        for eachfile in allfiles + alldirs:
+            currentfile = os.path.join(startdir, eachfile)
             raster, vector = None, None
             if (not skipfile(currentfile,skiplist)):
                 raster, vector = tryopends(currentfile)
             if raster:
                 try:
                     resultsraster, resultsFileStats = processraster(raster, counterraster, currentfile)
-                    xmlraster = outputraster(resultsraster, resultsFileStats, xmlroot)
+                    outputraster(resultsraster, resultsFileStats, xmlroot)
                     counterraster += 1
                 except NotGeographic:
                     pass
             if vector:
-                if not skipfile(vector.GetName(), skiplist):
-                    try:
-                        resultsvds, resultsFileStats = processvds(vector, countervds, currentfile)
-                        xmlvector = outputvector(resultsvds, resultsFileStats, xmlroot)
-                        countervds += 1
-                    except NotGeographic:
-                        pass
+                if skipfile(vector.GetName(), skiplist):
+                    raise Exception("This should not happen")
+                try:
+                    resultsvds, resultsFileStats = processvds(vector, countervds, currentfile)
+                    outputvector(resultsvds, resultsFileStats, xmlroot)
+                    countervds += 1
+                except NotGeographic:
+                    pass
 
         sys.stderr.write("\rFound %d vector and %d rasters datasets.   %s" % (countervds, counterraster, cursor.next()) )
         sys.stderr.flush()
