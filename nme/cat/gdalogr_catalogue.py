@@ -34,12 +34,16 @@ import json
 from optparse import OptionParser, OptionGroup
 from string import strip
 from time import asctime
+from datetime import datetime
 from pyproj import Proj
 from osgeo import gdal
 from osgeo import osr
 from osgeo import ogr
 
-logging.basicConfig( stream=sys.stderr, level=logging.WARNING)
+gdal.UseExceptions()
+ogr.UseExceptions()
+
+logging.basicConfig( stream=sys.stderr, level=logging.WARNING )
 log = logging.getLogger("catalog")
 
 
@@ -59,7 +63,6 @@ def getCatalog(startpath):
     cursor = spinning_cursor()
 
     dirlist, filelist = [], []
-    starttime = asctime()
 
     catalog = { 
         'raster_data': [],
@@ -78,11 +81,13 @@ def getCatalog(startpath):
         for eachfile in allfiles + alldirs:
             currentfile = os.path.join(startdir, eachfile)
             raster, vector = None, None
+            starttime = datetime.now()
             if (not skipfile(currentfile,skiplist)):
                 raster, vector = tryopends(currentfile)
             if raster:
                 try:
                     raster = processraster(raster, counterraster, currentfile)
+                    raster['time'] = (datetime.now() - starttime).total_seconds()
                     catalog['raster_data'].append(raster)
                     counterraster += 1
                 except NotGeographic:
@@ -92,6 +97,7 @@ def getCatalog(startpath):
                     raise Exception("This should not happen")
                 try:
                     vector = processvds(vector, countervds, currentfile)
+                    vector['time'] = (datetime.now() - starttime).total_seconds()
                     catalog['vector_data'].append(vector)
                     countervds += 1
                 except NotGeographic:
@@ -102,7 +108,7 @@ def getCatalog(startpath):
         sys.stderr.flush()
     
     sys.stderr.write("\n")
-    catalog['meta'] = processmeta(startpath, skiplist, dirlist, filelist, starttime)
+    catalog['meta'] = processmeta(startpath, skiplist, dirlist, filelist)
     return catalog
 
 class NotGeographic(Exception):
@@ -124,13 +130,18 @@ def tryopends(filepath):
     dsogr, dsgdal = False, False
     # GetFeatureCount and Extent are Way too slow and called many times TODO
     skip_drivers = ['AVCBin',] 
+
     try:
         dsgdal = gdal.OpenShared(filepath)
+    except RuntimeError:
+        pass
     except gdal.GDALError:
         pass
 
     try:
         dsogr = ogr.OpenShared(filepath)
+    except RuntimeError:
+        pass
     except ogr.OGRError:
         pass
 
@@ -203,7 +214,7 @@ def processraster(raster, counterraster, currentpath):
 
     return resultsraster
   
-def processmeta(startpath, skiplist, dirlist, filelist, starttime):
+def processmeta(startpath, skiplist, dirlist, filelist):
     processValues = {
             'SearchPath':startpath,
             'LaunchPath':os.getcwd(),
@@ -345,21 +356,14 @@ def getMd5HexDigest(encodeString):
     return m.hexdigest()
 
 if __name__ == '__main__':
-    parser = OptionParser(usage="gdalogr_catalog.py [options] -d /path/to/search")
-    parser.add_option("-d","--dir", action="store", type="string", dest="directory", 
-            help="Top level folder to start scanning from")
+    parser = OptionParser(usage="gdalogr_catalog.py /path/to/search -f output.json")
     parser.add_option("-f","--file", action="store", type="string", dest="outfile", 
             help="Output file (if specified, no stdout)" )
 
-    group = OptionGroup(parser, "Hack Options", "May not function without advanced knowledge")
-    group.add_option("-s","--sql", action="store_true", dest="printSql", 
-            help="Output results in SQL INSERT statements instead of XML")
-    parser.add_option_group(group)
-
     (options, args) = parser.parse_args()
 
-    startpath = options.directory
-    if not startpath and len(args) >= 1:
+    startpath = None
+    if len(args) == 1:
         startpath = args[0]
 
     if not startpath or not os.path.exists(startpath):
@@ -368,7 +372,7 @@ if __name__ == '__main__':
     catalog = getCatalog(startpath)
     if options.outfile:
         with open(options.outfile,'w') as out:
-            out.write(json.dumps(catalog))
+            out.write(json.dumps(catalog, indent=2))
             log.info("%s written" % options.outfile)
     else:
         print json.dumps(catalog, indent=2)
