@@ -39,11 +39,12 @@ from osgeo import gdal
 from osgeo import osr
 from osgeo import ogr
 
-logging.basicConfig( stream=sys.stderr, level=logging.WARNING )
+logging.basicConfig( stream=sys.stderr, level=logging.WARNING)
 log = logging.getLogger("catalog")
 
+
 def spinning_cursor():
-    cursor='/-\|'
+    cursor = '/-\|'
     i = 0
     while 1:
         yield cursor[i]
